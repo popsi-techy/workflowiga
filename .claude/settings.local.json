@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --src-dir false --import-alias \"@/*\" --no-turbopack --use-npm --yes)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/workflow/editor)",
+      "Bash(curl -sS http://localhost:3000/workflow/editor)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill bh41kiqrt *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "PowerShell(Stop-Process -Id 16612 -Force)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr \":3000\")"
+    ]
+  }
+}
