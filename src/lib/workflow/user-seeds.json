@@ -1,5 +1,431 @@
 [
   {
+    "id": "pol_glm9boq",
+    "name": "Privileged Finance System Access Request",
+    "type": "approval",
+    "status": "draft",
+    "createdAt": "2026-06-02T11:15:16.433Z",
+    "updatedAt": "2026-06-02T11:15:16.434Z",
+    "nodes": [
+      {
+        "id": "event_wgqadf6",
+        "kind": "event",
+        "data": {
+          "type": "approval_policy",
+          "name": "Privileged Finance System Access",
+          "description": ""
+        },
+        "status": "configured"
+      },
+      {
+        "id": "task_4dweip7",
+        "kind": "task",
+        "status": "configured",
+        "data": {
+          "taskType": "conditional_branch",
+          "name": "Stage 1 - Manager Relationship",
+          "conditionCount": 2,
+          "branchCount": 2,
+          "globalFallbackType": "",
+          "globalFallbackEmail": "",
+          "globalFallbackUsers": [],
+          "elseEnabled": true,
+          "branches": [
+            {
+              "id": "br_wey96v7",
+              "name": "Requester is Manager",
+              "levels": [
+                {
+                  "id": "lvl_2rqerl3",
+                  "blockType": "approval_level",
+                  "approverType": "Manager",
+                  "fallbackType": "",
+                  "fallbackEmail": "",
+                  "slaEnabled": false,
+                  "slaDuration": 48,
+                  "slaDurationUnit": "hours",
+                  "autoApproveOnTimeout": false,
+                  "slaTimeoutAction": "Auto Reject",
+                  "overrideFallback": false,
+                  "overrideSla": false,
+                  "approverRefs": [],
+                  "approverRule": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "fallbackUsers": [],
+                  "skipEnabled": false,
+                  "skip": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "completionMode": "all",
+                  "threshold": 1,
+                  "name": "Manager Approval"
+                }
+              ],
+              "condition": {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "id": "c_esxpqay",
+                    "attribute": "isRequesterManagerOfSubject",
+                    "operator": "equals",
+                    "value": "true"
+                  },
+                  {
+                    "id": "c_kuqfct5",
+                    "attribute": "isRequesterSameCompanyAsSubject",
+                    "operator": "equals",
+                    "value": "true"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "br_m1dfrta",
+              "name": "Owner is Manager",
+              "levels": [
+                {
+                  "id": "lvl_nzegsai",
+                  "blockType": "approval_level",
+                  "approverType": "Manager",
+                  "fallbackType": "",
+                  "fallbackEmail": "",
+                  "slaEnabled": false,
+                  "slaDuration": 48,
+                  "slaDurationUnit": "hours",
+                  "autoApproveOnTimeout": false,
+                  "slaTimeoutAction": "Auto Reject",
+                  "overrideFallback": false,
+                  "overrideSla": false,
+                  "approverRefs": [],
+                  "approverRule": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "fallbackUsers": [],
+                  "skipEnabled": false,
+                  "skip": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "completionMode": "all",
+                  "threshold": 1,
+                  "name": "Manager Approval"
+                }
+              ],
+              "condition": {
+                "logic": "AND",
+                "conditions": [
+                  {
+                    "id": "c_jk6dnw0",
+                    "attribute": "isAnyOwnerLineManagerOfSubject",
+                    "operator": "equals",
+                    "value": "true"
+                  },
+                  {
+                    "id": "c_d8biy7n",
+                    "attribute": "isAnyOwnerSameCompanyAsSubject",
+                    "operator": "equals",
+                    "value": "true"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "br_8dfxevo",
+              "name": "Else (Stage 2)",
+              "condition": {
+                "logic": "AND",
+                "conditions": []
+              },
+              "levels": [
+                {
+                  "id": "lvl_cwmqew8",
+                  "blockType": "conditional_branch",
+                  "name": "Stage 2 - Ownership & Dept",
+                  "approverType": "",
+                  "fallbackType": "",
+                  "fallbackEmail": "",
+                  "slaEnabled": false,
+                  "slaDuration": 48,
+                  "slaDurationUnit": "hours",
+                  "autoApproveOnTimeout": false,
+                  "slaTimeoutAction": "Auto Reject",
+                  "overrideFallback": false,
+                  "overrideSla": false,
+                  "approverRefs": [],
+                  "approverRule": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "fallbackUsers": [],
+                  "skipEnabled": false,
+                  "skip": {
+                    "logic": "AND",
+                    "conditions": []
+                  },
+                  "completionMode": "all",
+                  "threshold": 1,
+                  "embeddedConditional": {
+                    "name": "Stage 2 - Ownership & Dept",
+                    "routingAttributes": [],
+                    "globalFallbackType": "Block",
+                    "conditionCount": 2,
+                    "branchCount": 2,
+                    "elseEnabled": true,
+                    "branches": [
+                      {
+                        "id": "br_6cj6pot",
+                        "name": "Requester Owner",
+                        "levels": [
+                          {
+                            "id": "lvl_jqbvaz7",
+                            "blockType": "approval_level",
+                            "approverType": "Owner",
+                            "fallbackType": "",
+                            "fallbackEmail": "",
+                            "slaEnabled": false,
+                            "slaDuration": 48,
+                            "slaDurationUnit": "hours",
+                            "autoApproveOnTimeout": false,
+                            "slaTimeoutAction": "Auto Reject",
+                            "overrideFallback": false,
+                            "overrideSla": false,
+                            "approverRefs": [],
+                            "approverRule": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "fallbackUsers": [],
+                            "skipEnabled": false,
+                            "skip": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "completionMode": "all",
+                            "threshold": 1,
+                            "name": "Application Owner Approval"
+                          }
+                        ],
+                        "condition": {
+                          "logic": "AND",
+                          "conditions": [
+                            {
+                              "id": "c_v36efiu",
+                              "attribute": "isRequesterItemOwner",
+                              "operator": "equals",
+                              "value": "true"
+                            },
+                            {
+                              "id": "c_5d8g5ec",
+                              "attribute": "isRequesterSameDeptAsSubject",
+                              "operator": "equals",
+                              "value": "true"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": "br_xab80w0",
+                        "name": "Owner & Line Manager",
+                        "levels": [
+                          {
+                            "id": "lvl_2npi9om",
+                            "blockType": "approval_level",
+                            "approverType": "Owner",
+                            "fallbackType": "",
+                            "fallbackEmail": "",
+                            "slaEnabled": false,
+                            "slaDuration": 48,
+                            "slaDurationUnit": "hours",
+                            "autoApproveOnTimeout": false,
+                            "slaTimeoutAction": "Auto Reject",
+                            "overrideFallback": false,
+                            "overrideSla": false,
+                            "approverRefs": [],
+                            "approverRule": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "fallbackUsers": [],
+                            "skipEnabled": false,
+                            "skip": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "completionMode": "all",
+                            "threshold": 1,
+                            "name": "Application Owner Approval"
+                          }
+                        ],
+                        "condition": {
+                          "logic": "AND",
+                          "conditions": [
+                            {
+                              "id": "c_chkd2mn",
+                              "attribute": "isAnyOwnerSameDeptAsSubject",
+                              "operator": "equals",
+                              "value": "true"
+                            },
+                            {
+                              "id": "c_w2ukm16",
+                              "attribute": "isLineManagerSameDeptAsSubject",
+                              "operator": "equals",
+                              "value": "true"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "id": "br_u08daem",
+                        "name": "Else (Stage 3)",
+                        "condition": {
+                          "logic": "AND",
+                          "conditions": []
+                        },
+                        "levels": [
+                          {
+                            "id": "lvl_gvrgn3h",
+                            "blockType": "conditional_branch",
+                            "name": "Stage 3 - Risk",
+                            "approverType": "",
+                            "fallbackType": "",
+                            "fallbackEmail": "",
+                            "slaEnabled": false,
+                            "slaDuration": 48,
+                            "slaDurationUnit": "hours",
+                            "autoApproveOnTimeout": false,
+                            "slaTimeoutAction": "Auto Reject",
+                            "overrideFallback": false,
+                            "overrideSla": false,
+                            "approverRefs": [],
+                            "approverRule": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "fallbackUsers": [],
+                            "skipEnabled": false,
+                            "skip": {
+                              "logic": "AND",
+                              "conditions": []
+                            },
+                            "completionMode": "all",
+                            "threshold": 1,
+                            "embeddedConditional": {
+                              "name": "Stage 3 - Risk",
+                              "routingAttributes": [],
+                              "globalFallbackType": "Block",
+                              "conditionCount": 1,
+                              "branchCount": 1,
+                              "elseEnabled": true,
+                              "branches": [
+                                {
+                                  "id": "br_rd09p8d",
+                                  "name": "Cross-Company",
+                                  "levels": [
+                                    {
+                                      "id": "lvl_n2ku3rd",
+                                      "blockType": "approval_level",
+                                      "approverType": "Governance Group",
+                                      "fallbackType": "",
+                                      "fallbackEmail": "",
+                                      "slaEnabled": false,
+                                      "slaDuration": 48,
+                                      "slaDurationUnit": "hours",
+                                      "autoApproveOnTimeout": false,
+                                      "slaTimeoutAction": "Auto Reject",
+                                      "overrideFallback": false,
+                                      "overrideSla": false,
+                                      "approverRefs": [],
+                                      "approverRule": {
+                                        "logic": "AND",
+                                        "conditions": []
+                                      },
+                                      "fallbackUsers": [],
+                                      "skipEnabled": false,
+                                      "skip": {
+                                        "logic": "AND",
+                                        "conditions": []
+                                      },
+                                      "completionMode": "all",
+                                      "threshold": 1,
+                                      "name": "Security & Compliance"
+                                    }
+                                  ],
+                                  "condition": {
+                                    "logic": "OR",
+                                    "conditions": [
+                                      {
+                                        "id": "c_c074soo",
+                                        "attribute": "isRequesterSameCompanyAsSubject",
+                                        "operator": "equals",
+                                        "value": "false"
+                                      },
+                                      {
+                                        "id": "c_bvp1pci",
+                                        "attribute": "isAnyOwnerSameCompanyAsSubject",
+                                        "operator": "equals",
+                                        "value": "false"
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "id": "br_fz8q4wa",
+                                  "name": "Auto Approval",
+                                  "condition": {
+                                    "logic": "AND",
+                                    "conditions": []
+                                  },
+                                  "levels": [
+                                    {
+                                      "id": "lvl_e3x3ahb",
+                                      "blockType": "approval_level",
+                                      "approverType": "System",
+                                      "fallbackType": "",
+                                      "fallbackEmail": "",
+                                      "slaEnabled": true,
+                                      "slaDuration": 0,
+                                      "slaDurationUnit": "hours",
+                                      "autoApproveOnTimeout": true,
+                                      "slaTimeoutAction": "Auto Reject",
+                                      "overrideFallback": false,
+                                      "overrideSla": false,
+                                      "approverRefs": [],
+                                      "approverRule": {
+                                        "logic": "AND",
+                                        "conditions": []
+                                      },
+                                      "fallbackUsers": [],
+                                      "skipEnabled": false,
+                                      "skip": {
+                                        "logic": "AND",
+                                        "conditions": []
+                                      },
+                                      "completionMode": "all",
+                                      "threshold": 1,
+                                      "name": "Auto Approval"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "id": "pol_mpv77jjl_286",
     "name": "3 level policy",
     "type": "approval",
