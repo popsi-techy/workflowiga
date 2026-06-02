@@ -1,6 +1,6 @@
 "use client";
 
-import { ToggleRight, GitBranch, Check, Plus, Minus } from "lucide-react";
+import { Check, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkflowStore } from "@/lib/workflow/store";
 import {
@@ -87,27 +87,6 @@ export function ConditionalBranchV2Config({
   return (
     <div className="flex h-full flex-col">
       <ConfigBody>
-
-        {/* ── Condition Type ──────────────────────────────────────────── */}
-        <ConfigSection
-          title="Condition Type"
-          subtitle="Choose the type of condition to route on."
-        >
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1 text-[12px] font-medium text-[var(--accent)]"
-              aria-pressed
-            >
-              <ToggleRight className="h-3.5 w-3.5" />
-              Boolean
-              <Check className="h-3 w-3" />
-            </button>
-          </div>
-          <p className="mt-1.5 text-[11px] text-[var(--muted-fg)]">
-            More types coming soon (Numeric, Text).
-          </p>
-        </ConfigSection>
 
         {/* ── Else Branch ────────────────────────────────────────────── */}
         <ConfigSection
