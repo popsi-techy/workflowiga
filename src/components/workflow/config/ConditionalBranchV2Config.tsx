@@ -15,7 +15,7 @@ import { Switch } from "../Switch";
 import { Drawer } from "../Drawer";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { uid } from "@/lib/workflow/defaults";
-import { CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES } from "@/lib/workflow/mock-data";
+import { CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES, OPERATORS } from "@/lib/workflow/mock-data";
 import type {
   BooleanCaseValue,
   ConditionalBranchV2Data,
@@ -32,6 +32,14 @@ const CASE_COLORS: Record<BooleanCaseValue, { base: string; active: string }> = 
 };
 
 // ── Main component ──────────────────────────────────────────────────────────
+
+// ── Rule Formatting ───────────────────────────────────────────────────────────
+function formatRule(c: import("@/lib/workflow/types").Condition): string {
+  if (!c.attribute) return "Incomplete rule";
+  const opLabel = OPERATORS.find(o => o.value === c.operator)?.label || c.operator;
+  const valStr = Array.isArray(c.value) ? c.value.join(", ") : String(c.value);
+  return `${c.attribute} ${opLabel} ${valStr}`;
+}
 
 export function ConditionalBranchV2Config({
   node,
@@ -292,9 +300,15 @@ export function ConditionalBranchV2Config({
         >
           <div className="flex flex-col gap-2">
             {advancedConditions.map((adv, index) => {
-              const summary = adv.condition.conditions.length > 0 
-                ? `${adv.condition.conditions.length} rule(s)` 
-                : "Set condition";
+              let summary = "Set condition";
+              const conds = adv.condition.conditions;
+              if (conds.length > 0) {
+                const firstTwo = conds.slice(0, 2).map(formatRule);
+                summary = firstTwo.join(` ${adv.condition.logic} `);
+                if (conds.length > 2) {
+                  summary += ` +${conds.length - 2}`;
+                }
+              }
 
               return (
                 <div key={adv.id} className="overflow-hidden rounded-md border border-[var(--border)] bg-white">
