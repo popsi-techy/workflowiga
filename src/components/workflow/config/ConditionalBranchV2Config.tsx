@@ -9,7 +9,7 @@ import {
   BOOLEAN_CASE_ORDER,
   syncConditionalV2Branches,
 } from "@/lib/workflow/boolean-branch";
-import { ConfigBody, ConfigRow, ConfigSection } from "./config-layout";
+import { ConfigBody, ConfigInset, ConfigRow, ConfigSection } from "./config-layout";
 import { Switch } from "../Switch";
 import type {
   BooleanCaseValue,
@@ -89,10 +89,7 @@ export function ConditionalBranchV2Config({
       <ConfigBody>
 
         {/* ── Else Branch ────────────────────────────────────────────── */}
-        <ConfigSection
-          title="Else Branch"
-          subtitle="Catch-all for requests that don't match any condition above."
-        >
+        <ConfigInset>
           <ConfigRow
             label="Include Else branch"
             hint="Runs when no condition matched — typically exits or skips the flow"
@@ -104,7 +101,7 @@ export function ConditionalBranchV2Config({
               />
             }
           />
-        </ConfigSection>
+        </ConfigInset>
 
         {/* ── Attributes + inline branch builder ─────────────────────── */}
         <ConfigSection
