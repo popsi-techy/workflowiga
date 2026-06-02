@@ -109,6 +109,24 @@ export function ConditionalBranchV2Config({
           </p>
         </ConfigSection>
 
+        {/* ── Else Branch ────────────────────────────────────────────── */}
+        <ConfigSection
+          title="Else Branch"
+          subtitle="Catch-all for requests that don't match any condition above."
+        >
+          <ConfigRow
+            label="Include Else branch"
+            hint="Runs when no condition matched — typically exits or skips the flow"
+            action={
+              <Switch
+                id={`cbv2-else-${node.id}`}
+                enabled={data.elseEnabled}
+                onChange={(v) => patch({ elseEnabled: v })}
+              />
+            }
+          />
+        </ConfigSection>
+
         {/* ── Attributes + inline branch builder ─────────────────────── */}
         <ConfigSection
           title="Boolean Attributes"
@@ -220,24 +238,6 @@ export function ConditionalBranchV2Config({
               {data.elseEnabled && " · plus an Else branch"}.
             </p>
           )}
-        </ConfigSection>
-
-        {/* ── Else Branch ────────────────────────────────────────────── */}
-        <ConfigSection
-          title="Else Branch"
-          subtitle="Catch-all for requests that don't match any condition above."
-        >
-          <ConfigRow
-            label="Include Else branch"
-            hint="Runs when no condition matched — typically exits or skips the flow"
-            action={
-              <Switch
-                id={`cbv2-else-${node.id}`}
-                enabled={data.elseEnabled}
-                onChange={(v) => patch({ elseEnabled: v })}
-              />
-            }
-          />
         </ConfigSection>
 
       </ConfigBody>
