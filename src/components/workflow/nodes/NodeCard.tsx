@@ -15,7 +15,7 @@ import {
   paletteIconTileClass,
   palettePillSelectionClass,
 } from "@/lib/workflow/palette-tones";
-import { APPS, ATTRIBUTES, CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES, getApp } from "@/lib/workflow/mock-data";
+import { APPS, ATTRIBUTES, CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES, getApp, OPERATORS } from "@/lib/workflow/mock-data";
 import {
   branchSplitValuesComplete,
   formatBranchSplitSummary,
@@ -1384,10 +1384,26 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
       if (advBranch) {
         const continuingBranches = [advBranch].filter((b) => !branchEndsWithExit(b));
         const anyBranchMerges = continuingBranches.length > 0;
+        let badgeName = adv.name;
+        if (!badgeName) {
+          const conds = adv.condition.conditions;
+          if (conds.length > 0) {
+            const first = conds[0];
+            const opLabel = OPERATORS.find(o => o.value === first.operator)?.label || first.operator;
+            const valStr = Array.isArray(first.value) ? first.value.join(", ") : String(first.value);
+            badgeName = `${first.attribute} ${opLabel} ${valStr}`;
+            if (conds.length > 1) {
+              badgeName += ` +${conds.length - 1}`;
+            }
+          } else {
+            badgeName = "Advanced Expression";
+          }
+        }
+
         groups.push({
           id: adv.id,
           type: "advanced",
-          name: adv.name || "Advanced Expression",
+          name: badgeName,
           branches: [advBranch],
           anyBranchMerges,
           endsWithExit: !anyBranchMerges,
