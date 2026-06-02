@@ -101,6 +101,16 @@ export function syncConditionalV2Branches(
     }
   }
 
+  const advancedBranches: SplitBranchData[] = (data.advancedConditions ?? []).map(adv => {
+    const existing = prev.get(adv.id);
+    return {
+      id: adv.id,
+      name: adv.name || "Advanced condition",
+      levels: existing?.levels ?? [],
+      condition: adv.condition,
+    };
+  });
+
   let elseBranch: SplitBranchData | null = null;
   if (data.elseEnabled) {
     const elseId = "br_v2_else";
@@ -116,8 +126,8 @@ export function syncConditionalV2Branches(
   return {
     ...data,
     branches: elseBranch
-      ? [...conditionBranches, elseBranch]
-      : conditionBranches,
+      ? [...conditionBranches, ...advancedBranches, elseBranch]
+      : [...conditionBranches, ...advancedBranches],
   };
 }
 
@@ -136,12 +146,14 @@ export function syncEmbeddedConditionalV2Branches(
     globalFallbackType: data.globalFallbackType ?? "",
     globalFallbackEmail: "",
     globalFallbackUsers: [],
+    advancedConditions: data.advancedConditions ?? [],
   };
   const synced = syncConditionalV2Branches(dummy, previousBranches);
   return {
     ...data,
     selectedAttributes: synced.selectedAttributes,
     attributeCases: synced.attributeCases,
+    advancedConditions: synced.advancedConditions,
     elseEnabled: synced.elseEnabled,
     branches: synced.branches,
   };

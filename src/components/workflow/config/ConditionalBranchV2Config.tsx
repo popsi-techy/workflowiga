@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Plus, Minus } from "lucide-react";
+import { Check, Plus, Minus, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkflowStore } from "@/lib/workflow/store";
 import {
@@ -12,6 +12,10 @@ import {
 } from "@/lib/workflow/boolean-branch";
 import { ConfigBody, ConfigInset, ConfigRow, ConfigSection } from "./config-layout";
 import { Switch } from "../Switch";
+import { Drawer } from "../Drawer";
+import { ConditionBuilder } from "./ConditionBuilder";
+import { uid } from "@/lib/workflow/defaults";
+import { CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES } from "@/lib/workflow/mock-data";
 import type {
   BooleanCaseValue,
   ConditionalBranchV2Data,
@@ -38,7 +42,17 @@ export function ConditionalBranchV2Config({
 }) {
   const data = node.data as ConditionalBranchV2Data;
   const updateNode = useWorkflowStore((s) => s.updateNode);
+  const editorContext = useWorkflowStore((s) => s.editorContext);
+  const isWorkflow = editorContext === "workflow";
+  const routingAttributes = isWorkflow
+    ? CONDITIONAL_ATTRIBUTES
+    : APPROVAL_CONDITIONAL_ATTRIBUTES;
   const [showAll, setShowAll] = useState(false);
+  const [advancedEditingId, setAdvancedEditingId] = useState<string | null>(null);
+
+  const advancedConditions = data.advancedConditions ?? [];
+  const editingAdvancedIndex = advancedConditions.findIndex((a) => a.id === advancedEditingId);
+  const editingAdvanced = editingAdvancedIndex >= 0 ? advancedConditions[editingAdvancedIndex] : undefined;
 
   function patch(fields: Partial<ConditionalBranchV2Data>) {
     const merged = { ...data, ...fields };
@@ -48,6 +62,31 @@ export function ConditionalBranchV2Config({
     } else {
       updateNode(node.id, synced as Partial<ConditionalBranchV2Data>);
     }
+  }
+
+  function handleAddAdvanced() {
+    const newId = uid("c");
+    const nextList = [
+      ...advancedConditions,
+      {
+        id: newId,
+        name: "",
+        condition: { logic: "AND" as const, conditions: [] },
+      },
+    ];
+    patch({ advancedConditions: nextList });
+    setAdvancedEditingId(newId);
+  }
+
+  function handleRemoveAdvanced(id: string) {
+    patch({ advancedConditions: advancedConditions.filter((a) => a.id !== id) });
+    if (advancedEditingId === id) setAdvancedEditingId(null);
+  }
+
+  function handlePatchAdvanced(id: string, fields: Partial<typeof advancedConditions[0]>) {
+    patch({
+      advancedConditions: advancedConditions.map((a) => (a.id === id ? { ...a, ...fields } : a)),
+    });
   }
 
   function toggleAttribute(attrValue: string) {
@@ -245,7 +284,104 @@ export function ConditionalBranchV2Config({
           )}
         </ConfigSection>
 
+        {/* ── Advanced Expressions ───────────────────────────────────── */}
+        <ConfigSection
+          title="Advanced Expressions"
+          subtitle="Add custom conditions using expression builder. These branches run after Boolean checks."
+          inset={false}
+        >
+          <div className="flex flex-col gap-2">
+            {advancedConditions.map((adv, index) => {
+              const summary = adv.condition.conditions.length > 0 
+                ? `${adv.condition.conditions.length} rule(s)` 
+                : "Set condition";
+
+              return (
+                <div key={adv.id} className="overflow-hidden rounded-md border border-[var(--border)] bg-white">
+                  <div className="flex items-center gap-1.5 border-b border-[var(--border)]/70 bg-[var(--muted)]/25 px-2.5 py-1.5">
+                    <span className="inline-flex shrink-0 rounded px-1 py-px text-[9px] font-bold uppercase tracking-wide bg-[var(--accent-softer)] text-[#9A3412]">
+                      ADVANCED {index + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={adv.name}
+                      onChange={(e) => handlePatchAdvanced(adv.id, { name: e.target.value })}
+                      placeholder="Expression name"
+                      className="min-w-0 flex-1 bg-transparent text-[11.5px] font-medium text-[var(--foreground)] outline-none placeholder:text-[var(--muted-fg)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setAdvancedEditingId(adv.id)}
+                      title="Configure conditions"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--muted-fg)] hover:bg-[var(--accent-softer)] hover:text-[var(--accent)]"
+                    >
+                      <SlidersHorizontal className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAdvanced(adv.id)}
+                      title="Remove expression"
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--muted-fg)] hover:bg-red-50 hover:text-red-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedEditingId(adv.id)}
+                    className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-[var(--muted)]/30"
+                  >
+                    <span className={cn(
+                      "min-w-0 flex-1 truncate text-[11px]",
+                      adv.condition.conditions.length > 0 ? "text-[var(--foreground)]" : "text-[var(--muted-fg)]"
+                    )}>
+                      {summary}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+            
+            <button
+              type="button"
+              onClick={handleAddAdvanced}
+              className="inline-flex h-7 items-center gap-1 self-start rounded border border-dashed border-[var(--border)] px-2 text-[11px] font-medium text-[var(--muted-fg)] hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+            >
+              <Plus className="h-3 w-3" />
+              Add advanced expression
+            </button>
+          </div>
+        </ConfigSection>
+
       </ConfigBody>
+
+      <Drawer
+        open={!!editingAdvanced}
+        onClose={() => setAdvancedEditingId(null)}
+        title={editingAdvanced?.name || "Advanced Expression"}
+        description="Define custom conditions."
+        icon={SlidersHorizontal}
+        iconCategory="rules"
+        width={560}
+      >
+        {editingAdvanced && (
+          <ConditionBuilder
+            attributes={routingAttributes}
+            logic={editingAdvanced.condition.logic}
+            conditions={editingAdvanced.condition.conditions}
+            onLogicChange={(logic) =>
+              handlePatchAdvanced(editingAdvanced.id, {
+                condition: { ...editingAdvanced.condition, logic },
+              })
+            }
+            onChange={(conditions) =>
+              handlePatchAdvanced(editingAdvanced.id, {
+                condition: { ...editingAdvanced.condition, conditions },
+              })
+            }
+          />
+        )}
+      </Drawer>
     </div>
   );
 }

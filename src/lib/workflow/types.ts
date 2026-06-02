@@ -242,6 +242,7 @@ export interface EmbeddedConditionalData {
   conditionType?: ConditionalV2ConditionType;
   selectedAttributes?: string[];
   attributeCases?: Record<string, BooleanCaseValue[]>;
+  advancedConditions?: AdvancedCondition[];
 }
 
 export interface SplitBranchData {
@@ -395,6 +396,12 @@ export interface NotificationData {
  *  then shows the 8 IAM relationship attributes with True/False/Any/None chips.
  *  Branches are derived from `selectedAttributes` + `attributeCases` on every patch
  *  via `syncConditionalV2Branches()` — they are not edited independently. */
+export interface AdvancedCondition {
+  id: string;
+  name: string;
+  condition: SkipRule;
+}
+
 export interface ConditionalBranchV2Data {
   taskType: "conditional_branch_v2";
   name: string;
@@ -411,6 +418,7 @@ export interface ConditionalBranchV2Data {
   globalFallbackType: FallbackType | "";
   globalFallbackEmail: string;
   globalFallbackUsers?: string[];
+  advancedConditions?: AdvancedCondition[];
 }
 
 export type AnyTaskData =
