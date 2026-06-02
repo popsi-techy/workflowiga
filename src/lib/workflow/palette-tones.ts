@@ -73,6 +73,7 @@ export const PALETTE_TONES: Record<PaletteCategory, PaletteTone> = {
 const RULE_TASK_TYPES = new Set<TaskType>([
   "approval_split",
   "conditional_branch",
+  "conditional_branch_v2",
   "exit",
   "skip",
 ]);
@@ -128,7 +129,12 @@ export function paletteCategoryForBranchLevel(level: {
   blockType?: string;
 }): PaletteCategory {
   if (level.blockType === "exit" || level.blockType === "skip") return "rules";
-  if (level.blockType === "approval_split" || level.blockType === "sod_check")
+  if (
+    level.blockType === "approval_split" ||
+    level.blockType === "sod_check" ||
+    level.blockType === "conditional_branch" ||
+    level.blockType === "conditional_branch_v2"
+  )
     return "rules";
   if (level.blockType === "filter") return "filters";
   if (level.blockType === "approval_policy_ref") return "modules";

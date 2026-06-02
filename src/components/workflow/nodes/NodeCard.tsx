@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { Trash2, CheckCircle2, AlertCircle, Users, Clock, Mail, ShieldHalf, ShieldCheck, GitFork, Plus, X, SkipForward, Split, LogOut, ListChecks, Bell, Scale, Filter as FilterIcon } from "lucide-react";
+import { Trash2, CheckCircle2, AlertCircle, Users, Clock, Mail, ShieldHalf, ShieldCheck, GitFork, Plus, X, SkipForward, Split, LogOut, ListChecks, Bell, Scale, Filter as FilterIcon, ToggleRight, HelpCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkflowStore } from "@/lib/workflow/store";
@@ -39,6 +39,7 @@ import { BranchAddMenu } from "./BranchAddMenu";
 import {
   splitBranchLayout,
   maxConditionalNodeWidth,
+  branchColumnWidth,
 } from "@/lib/workflow/branch-column-layout";
 import {
   getConditionBranches,
@@ -46,6 +47,7 @@ import {
   isConditionalSetupComplete,
   resolveElseEnabled,
 } from "@/lib/workflow/conditional-branch";
+import { branchIdForAttrCase } from "@/lib/workflow/boolean-branch";
 import { separableOutcomes } from "@/lib/workflow/decision-outcomes";
 import {
   hasInlineDecision,
@@ -138,7 +140,9 @@ export function NodeCard({ node }: NodeCardProps) {
           ? Bell
           : taskType === "sod_check"
             ? Scale
-            : Icon;
+            : taskType === "conditional_branch_v2"
+              ? ToggleRight
+              : Icon;
   const isModuleRef = taskType === "approval_policy_ref";
   const isExitTask = taskType === "exit";
   const isNotification = taskType === "notification";
@@ -151,6 +155,16 @@ export function NodeCard({ node }: NodeCardProps) {
         data={node.data as ConditionalBranchData}
         view={view}
         conditional={true}
+      />
+    );
+  }
+  if (taskType === "conditional_branch_v2") {
+    return (
+      <ConditionalBranchV2Flow
+        mode="node"
+        node={node}
+        data={node.data as import("@/lib/workflow/types").ConditionalBranchV2Data}
+        view={view}
       />
     );
   }
@@ -343,6 +357,7 @@ function nodeTitle(node: WorkflowNode): string {
   if (td.taskType === "approval_level") return (td as ApprovalLevelData).name || "Approval Level";
   if (td.taskType === "approval_split") return (td as ApprovalSplitData).name || "Multisplit Branch";
   if (td.taskType === "conditional_branch") return (td as ConditionalBranchData).name || "Conditional Branch";
+  if (td.taskType === "conditional_branch_v2") return (td as import("@/lib/workflow/types").ConditionalBranchV2Data).name || "Conditional Type 2";
   if (td.taskType === "approval_policy_ref") return (td as ApprovalPolicyRefData).name || "Approval Policy";
   if (td.taskType === "exit") return (td as import("@/lib/workflow/types").ExitData).name || "Exit";
   if (td.taskType === "notification") return (td as import("@/lib/workflow/types").NotificationData).name || "Notification";
@@ -396,6 +411,13 @@ function nodeSubtitle(node: WorkflowNode): string {
     const count = getConditionBranchesFromContainer(cd).length;
     const elseNote = resolveElseEnabled(cd) ? " · else path on the right" : "";
     return `${count} ${count === 1 ? "condition" : "conditions"}${elseNote}`;
+  }
+  if (td.taskType === "conditional_branch_v2") {
+    const cd = td as import("@/lib/workflow/types").ConditionalBranchV2Data;
+    if (cd.selectedAttributes.length === 0) return "Select boolean attributes to branch on";
+    const condBranches = cd.elseEnabled ? cd.branches.length - 1 : cd.branches.length;
+    const elseNote = cd.elseEnabled ? " · else path" : "";
+    return `${cd.selectedAttributes.length} ${cd.selectedAttributes.length === 1 ? "attribute" : "attributes"} · ${condBranches} ${condBranches === 1 ? "branch" : "branches"}${elseNote}`;
   }
   if (td.taskType === "approval_policy_ref") {
     const rd = td as ApprovalPolicyRefData;
@@ -775,7 +797,7 @@ type SplitBranchesFlowProps =
   | {
       mode: "node";
       node: WorkflowNode;
-      data: ApprovalSplitData | ConditionalBranchData;
+      data: ApprovalSplitData | ConditionalBranchData | import("@/lib/workflow/types").ConditionalBranchV2Data;
       view: ViewMode;
       conditional?: boolean;
     }
@@ -1187,6 +1209,670 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
   );
 }
 
+type ConditionalBranchV2FlowProps =
+  | {
+      mode: "node";
+      node: WorkflowNode;
+      data: import("@/lib/workflow/types").ConditionalBranchV2Data;
+      view: ViewMode;
+    }
+  | {
+      mode: "embedded";
+      parentNodeId: string;
+      hostLevelId: string;
+      data: import("@/lib/workflow/types").EmbeddedConditionalData;
+      view: ViewMode;
+      onRemove?: () => void;
+    };
+
+function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
+  const selectedId = useWorkflowStore((s) => s.selectedId);
+  const selectNode = useWorkflowStore((s) => s.selectNode);
+  const removeNode = useWorkflowStore((s) => s.removeNode);
+  const updateNode = useWorkflowStore((s) => s.updateNode);
+
+  const isEmbedded = props.mode === "embedded";
+  const data = props.data;
+  const view = props.view;
+  const anchorId = isEmbedded ? props.hostLevelId : props.node.id;
+  const branchLineNodeId = isEmbedded ? props.parentNodeId : props.node.id;
+  const embeddedHostLevelId = isEmbedded ? props.hostLevelId : undefined;
+
+  const selected = selectedId === anchorId;
+  const splitCategory = "rules" as const;
+
+  function onCardClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    selectNode(anchorId);
+  }
+
+  function onDelete(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (isEmbedded) {
+      const remove = props.onRemove;
+      if (!remove) return;
+      const hasContent = data.branches.some((b) => b.levels.length > 0);
+      if (hasContent) {
+        useWorkflowStore.getState().requestConfirm({
+          title: "Remove this nested conditional?",
+          message: "This nested conditional has configured branches. Its settings will be discarded if you continue.",
+          confirmLabel: "Remove",
+          tone: "danger",
+          onConfirm: () => remove(),
+        });
+        return;
+      }
+      remove();
+    } else {
+      if (props.node.status === "configured") {
+        useWorkflowStore.getState().requestConfirm({
+          title: "Remove this conditional branch?",
+          message: "This is a configured node. Its settings will be discarded if you continue.",
+          confirmLabel: "Remove",
+          tone: "danger",
+          onConfirm: () => removeNode(props.node.id),
+        });
+        return;
+      }
+      removeNode(props.node.id);
+    }
+  }
+
+  function removeLevelFromBranch(branchId: string, levelId: string) {
+    const pruneLevels = (
+      levels: import("@/lib/workflow/types").ApprovalLevelConfig[],
+    ): import("@/lib/workflow/types").ApprovalLevelConfig[] =>
+      levels
+        .filter((l) => l.id !== levelId)
+        .map((l) => {
+          if (!l.embeddedConditional) {
+            return l;
+          }
+          return {
+            ...l,
+            embeddedConditional: {
+              ...l.embeddedConditional,
+              branches: l.embeddedConditional.branches.map((eb) => ({
+                ...eb,
+                levels: pruneLevels(eb.levels),
+              })),
+            },
+          };
+        });
+
+    const next = data.branches.map((b) => ({
+      ...b,
+      levels: pruneLevels(b.levels),
+    }));
+
+    if (isEmbedded) {
+      updateNode(props.hostLevelId, {
+        embeddedConditional: { ...props.data, branches: next },
+      } as unknown as Partial<WorkflowNode["data"]>);
+    } else {
+      updateNode(props.node.id, {
+        branches: next,
+      } as Partial<import("@/lib/workflow/types").ConditionalBranchV2Data>);
+    }
+  }
+
+  const branchEndsWithExit = (
+    branch: import("@/lib/workflow/types").SplitBranchData,
+  ) => {
+    const ls = branch.levels;
+    return ls.length > 0 && ls[ls.length - 1].blockType === "exit";
+  };
+
+  // Group branches by selected attributes
+  const groups: Array<{
+    id: string;
+    type: "attribute" | "else" | "placeholder";
+    name: string;
+    branches: import("@/lib/workflow/types").SplitBranchData[];
+    anyBranchMerges: boolean;
+    endsWithExit: boolean;
+  }> = [];
+
+  const selectedAttributes = data.selectedAttributes ?? [];
+  const attributeCases = data.attributeCases ?? {};
+  const elseEnabled = data.elseEnabled !== false;
+
+  const hasAnyCases = selectedAttributes.some(
+    (attr) => (attributeCases[attr] ?? []).length > 0
+  );
+  const isDefault = selectedAttributes.length === 0 || !hasAnyCases;
+
+  if (isDefault) {
+    const emptyBranch = data.branches.find((b) => b.id === "br_v2_empty_if");
+    if (emptyBranch) {
+      const continuingBranches = [emptyBranch].filter((b) => !branchEndsWithExit(b));
+      const anyBranchMerges = continuingBranches.length > 0;
+      groups.push({
+        id: "empty_if",
+        type: "placeholder",
+        name: "IF Set condition",
+        branches: [emptyBranch],
+        anyBranchMerges,
+        endsWithExit: !anyBranchMerges,
+      });
+    }
+  } else {
+    for (const attr of selectedAttributes) {
+      const cases = attributeCases[attr] ?? [];
+      const attrBranches = cases
+        .map((val) => data.branches.find((b) => b.id === branchIdForAttrCase(attr, val)))
+        .filter(Boolean) as import("@/lib/workflow/types").SplitBranchData[];
+
+      if (attrBranches.length > 0) {
+        const continuingBranches = attrBranches.filter((b) => !branchEndsWithExit(b));
+        const anyBranchMerges = continuingBranches.length > 0;
+        groups.push({
+          id: attr,
+          type: "attribute",
+          name: attr,
+          branches: attrBranches,
+          anyBranchMerges,
+          endsWithExit: !anyBranchMerges,
+        });
+      }
+    }
+  }
+
+  if (elseEnabled) {
+    const elseBranch = data.branches.find((b) => b.id === "br_v2_else");
+    if (elseBranch) {
+      const continuingBranches = [elseBranch].filter((b) => !branchEndsWithExit(b));
+      const anyBranchMerges = continuingBranches.length > 0;
+      groups.push({
+        id: "else",
+        type: "else",
+        name: "Else",
+        branches: [elseBranch],
+        anyBranchMerges,
+        endsWithExit: !anyBranchMerges,
+      });
+    }
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="flex flex-col items-center w-full select-none leading-none">
+        <div className="w-px h-6 bg-[var(--border-strong)]" />
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onCardClick}
+          className={cn(
+            "group relative flex items-center gap-1.5 rounded-full border bg-white px-3.5 py-1.5 text-[12px] font-semibold shadow-sm cursor-pointer transition-all hover:scale-105 hover:shadow-md",
+            palettePillSelectionClass(splitCategory, selected),
+          )}
+        >
+          <ToggleRight className="h-3.5 w-3.5" />
+          <span>{data.name || "Conditional Type 2"}</span>
+          <span className="rounded-full bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-fg)] font-medium">
+            0 attributes
+          </span>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="absolute -right-2.5 -top-2.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors shadow-sm"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate layout widths
+  const groupWidths = groups.map((g) =>
+    g.branches.reduce((sum, b) => sum + branchColumnWidth(b), 0)
+  );
+  const canvasW = groupWidths.reduce((sum, w) => sum + w, 0);
+  const groupOffsets = groupWidths.map((w, i) =>
+    groupWidths.slice(0, i).reduce((sum, x) => sum + x, 0)
+  );
+  const groupCenters = groupOffsets.map((left, i) => left + groupWidths[i] / 2);
+  const centerX = canvasW / 2;
+
+  const stemH = 24;
+  const splitH = 40;
+  const connH = stemH + splitH;
+  const ySplit = stemH + splitH / 2;
+  const connR = 12;
+
+  const continuingGroups = groups.filter((g) => !g.endsWithExit);
+  const anyGroupMerges = continuingGroups.length > 0;
+
+  const hasElse = data.elseEnabled && groups.some((g) => g.type === "else");
+  const spineX = (hasElse && groups.length > 1)
+    ? (groupWidths.slice(0, -1).reduce((sum, w) => sum + w, 0) / 2)
+    : centerX;
+  const spineShiftX = centerX - spineX;
+
+  const flowBody = (
+    <>
+      {/* Top Split lines SVG + Row of groups + Bottom Merge SVG wrapped in translated container */}
+      <div
+        className="relative shrink-0 animate-fade-in"
+        style={{
+          width: canvasW,
+          transform: spineShiftX ? `translateX(${spineShiftX}px)` : undefined,
+        }}
+      >
+        <svg
+          width={canvasW}
+          height={connH}
+          viewBox={`0 0 ${canvasW} ${connH}`}
+          fill="none"
+          className="block"
+        >
+          <line
+            x1={spineX}
+            y1={0}
+            x2={spineX}
+            y2={ySplit}
+            stroke="var(--border-strong)"
+            strokeWidth="1.5"
+          />
+          {groupCenters.map((x, idx) => {
+            if (x < spineX) {
+              return (
+                <path
+                  key={groups[idx].id}
+                  d={`M ${spineX} ${ySplit} L ${x + connR} ${ySplit} Q ${x} ${ySplit} ${x} ${ySplit + connR} L ${x} ${connH}`}
+                  stroke="var(--border-strong)"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              );
+            }
+            if (x > spineX) {
+              return (
+                <path
+                  key={groups[idx].id}
+                  d={`M ${spineX} ${ySplit} L ${x - connR} ${ySplit} Q ${x} ${ySplit} ${x} ${ySplit + connR} L ${x} ${connH}`}
+                  stroke="var(--border-strong)"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              );
+            }
+            return (
+              <path
+                key={groups[idx].id}
+                d={`M ${spineX} ${ySplit} L ${spineX} ${connH}`}
+                stroke="var(--border-strong)"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            );
+          })}
+        </svg>
+
+        {/* Horizontal row of groups */}
+        <div className="flex items-stretch" style={{ width: canvasW }}>
+          {groups.map((group, groupIdx) => {
+            const groupW = groupWidths[groupIdx];
+            const isElse = group.type === "else";
+
+            // Calculate sub-branch centers & layout relative to the group container
+            const branchWidths = group.branches.map((b) => branchColumnWidth(b));
+            const branchCenters = branchWidths.map((w, idx) => {
+              const left = branchWidths.slice(0, idx).reduce((sum, x) => sum + x, 0);
+              return left + w / 2;
+            });
+
+            const isDefaultView = isDefault;
+
+            if (isDefaultView) {
+              const branch = group.branches[0];
+              return (
+                <div
+                  key={group.id}
+                  className="flex flex-col items-center animate-fade-in self-stretch"
+                  style={{ width: groupW, maxWidth: groupW }}
+                >
+                  <BranchConditionChip
+                    branch={branch}
+                    branchIndex={groupIdx}
+                    totalBranches={groups.length}
+                    hasElseBranch={elseEnabled}
+                    onClick={onCardClick}
+                  />
+                  <BranchLine
+                    nodeId={branchLineNodeId}
+                    branch={branch}
+                    embeddedHostLevelId={embeddedHostLevelId}
+                    onRemoveLevel={(levelId) => removeLevelFromBranch(branch.id, levelId)}
+                    view={view}
+                    multisplitBranch={false}
+                    workflowMultisplitBranch={false}
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <div
+                key={group.id}
+                className="flex flex-col items-center animate-fade-in self-stretch"
+                style={{ width: groupW, maxWidth: groupW }}
+              >
+                {/* Attribute Header Badge */}
+                <div className="relative flex items-center justify-center z-10">
+                  {isElse ? (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-medium text-[var(--muted-fg)] shadow-sm">
+                      <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
+                      <span>Else (all other requests)</span>
+                    </div>
+                  ) : group.type === "placeholder" ? (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-medium text-[var(--muted-fg)] shadow-sm">
+                      <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
+                      <span>IF Set condition</span>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                      <span className="font-mono text-[10.5px] truncate max-w-[200px]" title={group.name}>
+                        {group.name}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-split SVG within the group (from attribute badge to case chips) */}
+                {group.branches.length > 1 ? (
+                  <div className="relative shrink-0 w-full">
+                    <svg
+                      width={groupW}
+                      height={32}
+                      viewBox={`0 0 ${groupW} 32`}
+                      fill="none"
+                      className="block"
+                    >
+                      <line
+                        x1={groupW / 2}
+                        y1={0}
+                        x2={groupW / 2}
+                        y2={12}
+                        stroke="var(--border-strong)"
+                        strokeWidth="1.5"
+                      />
+                      {branchCenters.map((x, idx) => {
+                        if (x < groupW / 2) {
+                          return (
+                            <path
+                              key={group.branches[idx].id}
+                              d={`M ${groupW / 2} 12 L ${x + 8} 12 Q ${x} 12 ${x} 18 L ${x} 32`}
+                              stroke="var(--border-strong)"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                          );
+                        }
+                        if (x > groupW / 2) {
+                          return (
+                            <path
+                              key={group.branches[idx].id}
+                              d={`M ${groupW / 2} 12 L ${x - 8} 12 Q ${x} 12 ${x} 18 L ${x} 32`}
+                              stroke="var(--border-strong)"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                          );
+                        }
+                        return (
+                          <path
+                            key={group.branches[idx].id}
+                            d={`M ${groupW / 2} 12 L ${groupW / 2} 32`}
+                            stroke="var(--border-strong)"
+                            strokeWidth="1.5"
+                            fill="none"
+                          />
+                        );
+                      })}
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-px h-8 bg-[var(--border-strong)] shrink-0" />
+                )}
+
+                {/* Sub-branch columns */}
+                <div className="flex items-stretch w-full grow">
+                  {group.branches.map((branch, branchIndex) => {
+                    const branchW = branchWidths[branchIndex];
+
+                    // Determine case label and design
+                    let caseVal: string = "";
+                    if (branch.id === "br_v2_else") {
+                      caseVal = "Else";
+                    } else if (branch.id === "br_v2_empty_if") {
+                      caseVal = "IF";
+                    } else {
+                      const suffix = branch.id.replace(`br_v2_${group.id}_`, "");
+                      caseVal = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+                    }
+
+                    const isTrue = caseVal.toLowerCase() === "true";
+                    const isFalse = caseVal.toLowerCase() === "false";
+                    const isAny = caseVal.toLowerCase() === "any";
+                    const isNone = caseVal.toLowerCase() === "none";
+                    const isIf = caseVal.toLowerCase() === "if";
+
+                    return (
+                      <div
+                        key={branch.id}
+                        className="flex flex-col items-center animate-fade-in self-stretch"
+                        style={{ width: branchW, maxWidth: branchW }}
+                      >
+                        {/* Case Pill */}
+                        <div
+                          className={cn(
+                            "relative mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9.5px] font-bold tracking-wide uppercase shadow-sm bg-white z-10",
+                            isTrue
+                              ? "border-emerald-200 text-emerald-700"
+                              : isFalse
+                                ? "border-rose-200 text-rose-700"
+                                : isAny
+                                  ? "border-sky-200 text-sky-700"
+                                  : isIf
+                                    ? "border-amber-200 text-amber-700"
+                                    : "border-slate-300 text-slate-600"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "h-1 w-1 rounded-full",
+                              isTrue
+                                ? "bg-emerald-500"
+                                : isFalse
+                                  ? "bg-rose-500"
+                                  : isAny
+                                    ? "bg-sky-500"
+                                    : isIf
+                                      ? "bg-amber-500"
+                                      : "bg-slate-400"
+                            )}
+                          />
+                          <span>{caseVal}</span>
+                        </div>
+
+                        {/* Branch Level cards and connector lines */}
+                        <BranchLine
+                          nodeId={branchLineNodeId}
+                          branch={branch}
+                          embeddedHostLevelId={embeddedHostLevelId}
+                          onRemoveLevel={(levelId) => removeLevelFromBranch(branch.id, levelId)}
+                          view={view}
+                          multisplitBranch={false}
+                          workflowMultisplitBranch={false}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sub-merge SVG (from case branch lines back to group output line) */}
+                {group.branches.length > 1 ? (
+                  <div className="relative shrink-0 w-full mt-auto">
+                    <svg
+                      width={groupW}
+                      height={24}
+                      viewBox={`0 0 ${groupW} 24`}
+                      fill="none"
+                      className="block"
+                    >
+                      {branchCenters.map((x, idx) => {
+                        const branch = group.branches[idx];
+                        if (branchEndsWithExit(branch)) return null;
+
+                        if (x < groupW / 2) {
+                          return (
+                            <path
+                              key={branch.id}
+                              d={`M ${x} 0 L ${x} 8 Q ${x} 14 ${x + 6} 14 L ${groupW / 2} 14`}
+                              stroke="var(--border-strong)"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                          );
+                        }
+                        if (x > groupW / 2) {
+                          return (
+                            <path
+                              key={branch.id}
+                              d={`M ${x} 0 L ${x} 8 Q ${x} 14 ${x - 6} 14 L ${groupW / 2} 14`}
+                              stroke="var(--border-strong)"
+                              strokeWidth="1.5"
+                              fill="none"
+                            />
+                          );
+                        }
+                        return (
+                          <path
+                            key={branch.id}
+                            d={`M ${groupW / 2} 0 L ${groupW / 2} 14`}
+                            stroke="var(--border-strong)"
+                            strokeWidth="1.5"
+                            fill="none"
+                          />
+                        );
+                      })}
+                      {group.anyBranchMerges && (
+                        <line
+                          x1={groupW / 2}
+                          y1={14}
+                          x2={groupW / 2}
+                          y2={24}
+                          stroke="var(--border-strong)"
+                          strokeWidth="1.5"
+                        />
+                      )}
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="w-px h-6 bg-[var(--border-strong)] mt-auto shrink-0" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Bottom Global Merge lines SVG */}
+        <svg
+          width={canvasW}
+          height={40}
+          viewBox={`0 0 ${canvasW} 40`}
+          fill="none"
+          className="block"
+        >
+          {groupCenters.map((x, idx) => {
+            const group = groups[idx];
+            if (group.endsWithExit) return null;
+
+            if (x < spineX) {
+              return (
+                <path
+                  key={group.id}
+                  d={`M ${x} 0 L ${x} 12 Q ${x} 20 ${x + connR} 20 L ${spineX} 20`}
+                  stroke="var(--border-strong)"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              );
+            }
+            if (x > spineX) {
+              return (
+                <path
+                  key={group.id}
+                  d={`M ${x} 0 L ${x} 12 Q ${x} 20 ${x - connR} 20 L ${spineX} 20`}
+                  stroke="var(--border-strong)"
+                  strokeWidth="1.5"
+                  fill="none"
+                />
+              );
+            }
+            return (
+              <path
+                key={group.id}
+                d={`M ${spineX} 0 L ${spineX} 20`}
+                stroke="var(--border-strong)"
+                strokeWidth="1.5"
+                fill="none"
+              />
+            );
+          })}
+          {anyGroupMerges && (
+            <line
+              x1={spineX}
+              y1={20}
+              x2={spineX}
+              y2={40}
+              stroke="var(--border-strong)"
+              strokeWidth="1.5"
+            />
+          )}
+        </svg>
+      </div>
+    </>
+  );
+
+  return (
+    <div className="flex flex-col items-center w-full select-none leading-none">
+      <div className="w-px h-6 bg-[var(--border-strong)]" />
+      
+      {/* 1. Main badge */}
+      <div className="relative flex items-center justify-center">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onCardClick}
+          className={cn(
+            "group relative flex items-center gap-1.5 rounded-full border bg-white px-3.5 py-1.5 text-[12px] font-semibold shadow-sm cursor-pointer transition-all hover:scale-105 hover:shadow-md",
+            palettePillSelectionClass(splitCategory, selected),
+          )}
+        >
+          <ToggleRight className="h-3.5 w-3.5" />
+          <span>{data.name || "Conditional Type 2"}</span>
+          <span className="rounded-full bg-[var(--muted)] px-1.5 py-0.5 text-[10px] text-[var(--muted-fg)] font-medium">
+            {groups.length} paths
+          </span>
+          <button
+            type="button"
+            onClick={onDelete}
+            className="absolute -right-2.5 -top-2.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-50 border border-red-200 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors shadow-sm"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      {flowBody}
+    </div>
+  );
+}
+
 const OP_SYMBOL: Record<string, string> = {
   equals: "=",
   not_equals: "≠",
@@ -1371,16 +2057,29 @@ function BranchLine({
                 className="flex w-full flex-col items-center overflow-visible"
               >
                 {isNestedFlowLevel(level) ? (
-                  <SplitBranchesFlow
-                    mode="embedded"
-                    parentNodeId={nodeId}
-                    hostLevelId={level.id}
-                    data={level.embeddedConditional!}
-                    view={view}
-                    onRemove={
-                      isComboDecision ? undefined : () => onRemoveLevel(level.id)
-                    }
-                  />
+                  level.blockType === "conditional_branch_v2" ? (
+                    <ConditionalBranchV2Flow
+                      mode="embedded"
+                      parentNodeId={nodeId}
+                      hostLevelId={level.id}
+                      data={level.embeddedConditional!}
+                      view={view}
+                      onRemove={
+                        isComboDecision ? undefined : () => onRemoveLevel(level.id)
+                      }
+                    />
+                  ) : (
+                    <SplitBranchesFlow
+                      mode="embedded"
+                      parentNodeId={nodeId}
+                      hostLevelId={level.id}
+                      data={level.embeddedConditional!}
+                      view={view}
+                      onRemove={
+                        isComboDecision ? undefined : () => onRemoveLevel(level.id)
+                      }
+                    />
+                  )
                 ) : (
                   <>
                     <BranchLevelCard

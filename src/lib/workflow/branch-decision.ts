@@ -43,6 +43,7 @@ export function hasInlineDecision(level: ApprovalLevelConfig): boolean {
 export function isNestedFlowLevel(level: ApprovalLevelConfig): boolean {
   return (
     (level.blockType === "conditional_branch" ||
+      level.blockType === "conditional_branch_v2" ||
       level.blockType === "approval_split") &&
     !!level.embeddedConditional
   );

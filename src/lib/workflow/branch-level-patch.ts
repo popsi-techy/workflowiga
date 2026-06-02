@@ -33,6 +33,7 @@ export function patchBranchesLevels(
           emb &&
           !emb.decisionKind &&
           (merged.blockType === "conditional_branch" ||
+            merged.blockType === "conditional_branch_v2" ||
             merged.blockType === "approval_split")
         ) {
           merged.embeddedConditional = { ...emb, name: patch.name };

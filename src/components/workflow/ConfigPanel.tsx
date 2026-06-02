@@ -29,6 +29,7 @@ import { ApprovalPolicyConfig } from "./config/ApprovalPolicyConfig";
 import { ApprovalLevelConfig } from "./config/ApprovalLevelConfig";
 import { ApprovalSplitConfig } from "./config/ApprovalSplitConfig";
 import { ConditionalBranchConfig } from "./config/ConditionalBranchConfig";
+import { ConditionalBranchV2Config } from "./config/ConditionalBranchV2Config";
 import { ApprovalDecisionConfig } from "./config/ApprovalDecisionConfig";
 import { DecisionOutcomesSection } from "./config/ApprovalOutcomes";
 import { ConfigBody } from "./config/config-layout";
@@ -249,10 +250,21 @@ export function ConfigPanel() {
             status: "configured",
             data: {
               taskType:
-                level.embeddedConditional.splitKind === "multisplit"
-                  ? "approval_split"
-                  : "conditional_branch",
+                level.blockType === "conditional_branch_v2"
+                  ? "conditional_branch_v2"
+                  : level.embeddedConditional.splitKind === "multisplit"
+                    ? "approval_split"
+                    : "conditional_branch",
               name: level.embeddedConditional.name,
+              ...(level.blockType === "conditional_branch_v2"
+                ? {
+                    conditionType: level.embeddedConditional.conditionType ?? "boolean",
+                    selectedAttributes: level.embeddedConditional.selectedAttributes ?? [],
+                    attributeCases: level.embeddedConditional.attributeCases ?? {},
+                    elseEnabled: level.embeddedConditional.elseEnabled !== false,
+                    branches: level.embeddedConditional.branches ?? [],
+                  }
+                : {}),
             },
           } as WorkflowNode,
           embeddedConditional: {
@@ -344,7 +356,16 @@ export function ConfigPanel() {
         )}
 
         {embeddedConditional &&
-          (embeddedConditional.data.splitKind === "multisplit" ? (
+          (taskType === "conditional_branch_v2" ? (
+            <ConditionalBranchV2Config
+              node={node}
+              onPatch={(fields) =>
+                updateNode(embeddedConditional.hostLevelId, {
+                  embeddedConditional: fields,
+                } as unknown as Partial<WorkflowNode["data"]>)
+              }
+            />
+          ) : embeddedConditional.data.splitKind === "multisplit" ? (
             <EmbeddedMultisplitConfig
               hostLevelId={embeddedConditional.hostLevelId}
               data={embeddedConditional.data}
@@ -393,6 +414,9 @@ export function ConfigPanel() {
             <ConditionalBranchConfig node={node} />
           )
         )}
+        {!embeddedConditional && !embeddedDecision && node.kind === "task" && taskType === "conditional_branch_v2" && (
+          <ConditionalBranchV2Config node={node} />
+        )}
         {!embeddedConditional && !embeddedDecision && node.kind === "task" && taskType === "approval_policy_ref" && (
           <ApprovalPolicyRefConfig
             node={node}
@@ -437,6 +461,7 @@ export function ConfigPanel() {
           taskType !== "approval_level" &&
           taskType !== "approval_split" &&
           taskType !== "conditional_branch" &&
+          taskType !== "conditional_branch_v2" &&
           taskType !== "approval_policy_ref" &&
           taskType !== "exit" &&
           taskType !== "skip" &&
@@ -459,6 +484,7 @@ const EVENT_TITLES: Record<EventType, string> = {
 const TASK_HINTS: Partial<Record<TaskType, string>> = {
   approval_split: "Parallel branches",
   conditional_branch: "First matching branch wins",
+  conditional_branch_v2: "Boolean relationship routing",
   approval_level: "Approver, fallback & SLA",
   assign_entities: "Apps, entitlements & roles",
   approval_policy_ref: "Linked approval policy",

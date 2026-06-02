@@ -13,6 +13,7 @@ import {
   Bell,
   SkipForward,
   Scale,
+  ToggleRight,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { EditorContext, EventType, NodeKind, WorkflowNode } from "./types";
@@ -181,6 +182,14 @@ export const APPROVAL_RULE_ITEMS: PaletteItem[] = [
     icon: Split,
     label: "Conditional Branch",
     description: "Route the request down the first matching branch",
+  },
+  {
+    dragId: "palette-task-conditional-branch-v2",
+    kind: "task",
+    preset: { taskType: "conditional_branch_v2" },
+    icon: ToggleRight,
+    label: "Conditional Type 2",
+    description: "Route by boolean relationship attributes — True, False, Any or None",
   },
   SKIP_ITEM,
   EXIT_ITEM,

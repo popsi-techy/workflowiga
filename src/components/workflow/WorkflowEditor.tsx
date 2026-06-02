@@ -25,6 +25,7 @@ import {
 } from "@/lib/workflow/multisplit-decision";
 import {
   defaultNestedConditionalLevel,
+  defaultNestedConditionalV2Level,
   defaultNestedMultisplitLevel,
   defaultBranchFilterConfig,
   defaultBranchModuleConfig,
@@ -269,6 +270,14 @@ export function WorkflowEditor() {
           branchId,
           index,
           defaultNestedConditionalLevel({ name: "Conditional Branch" }),
+          embeddedHostLevelId,
+        );
+      } else if (preset?.taskType === "conditional_branch_v2") {
+        insertNodeIntoBranch(
+          nodeId,
+          branchId,
+          index,
+          defaultNestedConditionalV2Level({ name: "Conditional Type 2" }),
           embeddedHostLevelId,
         );
       } else if (preset?.taskType === "approval_split") {

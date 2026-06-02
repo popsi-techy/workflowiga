@@ -14,6 +14,7 @@ import {
   notificationAudiencesConfigured,
 } from "./notification-audience";
 import { SOD_VIOLATION_MESSAGE, defaultBranchExitConfig, isBranchFilterConfigured } from "./branch-blocks";
+import { syncConditionalV2Branches } from "./boolean-branch";
 
 let counter = 0;
 export function uid(prefix = "n"): string {
@@ -131,6 +132,22 @@ export function defaultConditionalBranch(): import("./types").ConditionalBranchD
   };
 }
 
+export function defaultConditionalBranchV2(): import("./types").ConditionalBranchV2Data {
+  const base: import("./types").ConditionalBranchV2Data = {
+    taskType: "conditional_branch_v2",
+    name: "Conditional Type 2",
+    conditionType: "boolean",
+    selectedAttributes: [],
+    attributeCases: {},
+    elseEnabled: true,
+    branches: [],
+    globalFallbackType: "",
+    globalFallbackEmail: "",
+    globalFallbackUsers: [],
+  };
+  return syncConditionalV2Branches(base);
+}
+
 export function defaultApprovalPolicyRef(): import("./types").ApprovalPolicyRefData {
   return {
     taskType: "approval_policy_ref",
@@ -200,6 +217,87 @@ export function defaultNotification(): import("./types").NotificationData {
     slackMessage: DEFAULT_NOTIFICATION_MESSAGE,
     emailMessage: DEFAULT_NOTIFICATION_MESSAGE,
   };
+}
+
+export function isLevelConfigured(
+  l: ApprovalLevelConfig,
+  globalFallbackType: import("./types").FallbackType | "" = "",
+): boolean {
+  if (l.blockType === "exit" || l.blockType === "skip") return true;
+  if (l.blockType === "filter") return isBranchFilterConfigured(l);
+  if (l.blockType === "approval_policy_ref") return !!l.policyId;
+  if (l.blockType === "notification") {
+    const audiences = normalizeNotificationAudiences(
+      l.notificationAudiences ?? l.notificationAudience,
+    );
+    return (
+      (l.notificationChannels?.length ?? 0) > 0 &&
+      notificationAudiencesConfigured(
+        audiences,
+        l.notificationRecipients ?? [],
+      )
+    );
+  }
+  if (l.blockType === "conditional_branch" && l.embeddedConditional) {
+    const emb = l.embeddedConditional;
+    const embHasElse = emb.elseEnabled !== false;
+    const embConditionBranches = embHasElse
+      ? emb.branches.slice(0, -1)
+      : emb.branches;
+    const embHasCondition = embConditionBranches.some((br) =>
+      (br.condition?.conditions ?? []).some(
+        (c) =>
+          c.attribute &&
+          (Array.isArray(c.value) ? c.value.length : c.value),
+      ),
+    );
+    const embLevels = emb.branches.reduce(
+      (acc, br) => acc + br.levels.length,
+      0,
+    );
+    if (!embHasCondition || embLevels === 0) return false;
+    return emb.branches.every((br) =>
+      br.levels.every((inner) => isLevelConfigured(inner, emb.globalFallbackType)),
+    );
+  }
+  if (l.blockType === "conditional_branch_v2" && l.embeddedConditional) {
+    const emb = l.embeddedConditional;
+    const selectedAttributes = emb.selectedAttributes ?? [];
+    if (selectedAttributes.length === 0) return false;
+    const allHaveCases = selectedAttributes.every(
+      (attr) => (emb.attributeCases?.[attr]?.length ?? 0) > 0,
+    );
+    if (!allHaveCases) return false;
+    const embLevels = emb.branches.reduce(
+      (acc, br) => acc + br.levels.length,
+      0,
+    );
+    if (embLevels === 0) return false;
+    return emb.branches.every((br) =>
+      br.levels.every((inner) => isLevelConfigured(inner, emb.globalFallbackType)),
+    );
+  }
+  if (l.blockType === "approval_split" && l.embeddedConditional) {
+    const emb = l.embeddedConditional;
+    const totalLevels = emb.branches.reduce((acc, br) => acc + br.levels.length, 0);
+    if (totalLevels === 0) return false;
+    return emb.branches.every((br) =>
+      br.levels.every((inner) => isLevelConfigured(inner, emb.globalFallbackType)),
+    );
+  }
+  if (l.blockType === "assign_entities") {
+    return (
+      (l.appIds?.length ?? 0) +
+        (l.entitlementIds?.length ?? 0) +
+        (l.techRoleIds?.length ?? 0) +
+        (l.businessRoleIds?.length ?? 0) >
+      0
+    );
+  }
+  const effectiveFallback = l.overrideFallback
+    ? l.fallbackType
+    : globalFallbackType;
+  return l.approverType !== "" && effectiveFallback !== "";
 }
 
 export function computeStatus(node: WorkflowNode): WorkflowNode["status"] {
@@ -273,25 +371,7 @@ export function computeStatus(node: WorkflowNode): WorkflowNode["status"] {
     const totalLevels = sd.branches.reduce((acc, br) => acc + br.levels.length, 0);
     if (totalLevels === 0) return "incomplete";
     const allConfigured = sd.branches.every((br) =>
-      br.levels.every((l) => {
-        if (l.blockType === "exit" || l.blockType === "skip") return true;
-        if (l.blockType === "filter") return isBranchFilterConfigured(l);
-        if (l.blockType === "approval_policy_ref") return !!l.policyId;
-        if (l.blockType === "notification") {
-          return (l.notificationChannels?.length ?? 0) > 0;
-        }
-        if (l.blockType === "assign_entities") {
-          return (
-            (l.appIds?.length ?? 0) +
-              (l.entitlementIds?.length ?? 0) +
-              (l.techRoleIds?.length ?? 0) +
-              (l.businessRoleIds?.length ?? 0) >
-            0
-          );
-        }
-        const effectiveFallback = l.overrideFallback ? l.fallbackType : sd.globalFallbackType;
-        return l.approverType !== "" && effectiveFallback !== "";
-      })
+      br.levels.every((l) => isLevelConfigured(l, sd.globalFallbackType))
     );
     return allConfigured ? "configured" : "incomplete";
   }
@@ -312,60 +392,20 @@ export function computeStatus(node: WorkflowNode): WorkflowNode["status"] {
       ),
     );
     if (!hasCondition) return "incomplete";
-    const levelConfigured = (l: ApprovalLevelConfig): boolean => {
-      if (l.blockType === "exit" || l.blockType === "skip") return true;
-      if (l.blockType === "filter") return isBranchFilterConfigured(l);
-      if (l.blockType === "approval_policy_ref") return !!l.policyId;
-      if (l.blockType === "notification") {
-        const audiences = normalizeNotificationAudiences(
-          l.notificationAudiences ?? l.notificationAudience,
-        );
-        return (
-          (l.notificationChannels?.length ?? 0) > 0 &&
-          notificationAudiencesConfigured(
-            audiences,
-            l.notificationRecipients ?? [],
-          )
-        );
-      }
-      if (l.blockType === "conditional_branch" && l.embeddedConditional) {
-        const emb = l.embeddedConditional;
-        const embHasElse = emb.elseEnabled !== false;
-        const embConditionBranches = embHasElse
-          ? emb.branches.slice(0, -1)
-          : emb.branches;
-        const embHasCondition = embConditionBranches.some((br) =>
-          (br.condition?.conditions ?? []).some(
-            (c) =>
-              c.attribute &&
-              (Array.isArray(c.value) ? c.value.length : c.value),
-          ),
-        );
-        const embLevels = emb.branches.reduce(
-          (acc, br) => acc + br.levels.length,
-          0,
-        );
-        if (!embHasCondition || embLevels === 0) return false;
-        return emb.branches.every((br) =>
-          br.levels.every((inner) => levelConfigured(inner)),
-        );
-      }
-      if (l.blockType === "assign_entities") {
-        return (
-          (l.appIds?.length ?? 0) +
-            (l.entitlementIds?.length ?? 0) +
-            (l.techRoleIds?.length ?? 0) +
-            (l.businessRoleIds?.length ?? 0) >
-          0
-        );
-      }
-      const effectiveFallback = l.overrideFallback
-        ? l.fallbackType
-        : cd.globalFallbackType;
-      return l.approverType !== "" && effectiveFallback !== "";
-    };
     const allConfigured = cd.branches.every((br) =>
-      br.levels.every((l) => levelConfigured(l)),
+      br.levels.every((l) => isLevelConfigured(l, cd.globalFallbackType)),
+    );
+    return allConfigured ? "configured" : "incomplete";
+  }
+  if (d.taskType === "conditional_branch_v2") {
+    const cd = d as import("./types").ConditionalBranchV2Data;
+    if (cd.selectedAttributes.length === 0) return "incomplete";
+    const allHaveCases = cd.selectedAttributes.every(
+      (attr) => (cd.attributeCases[attr]?.length ?? 0) > 0,
+    );
+    if (!allHaveCases) return "incomplete";
+    const allConfigured = cd.branches.every((br) =>
+      br.levels.every((l) => isLevelConfigured(l, cd.globalFallbackType)),
     );
     return allConfigured ? "configured" : "incomplete";
   }

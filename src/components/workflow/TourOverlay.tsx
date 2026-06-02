@@ -12,19 +12,28 @@ const TOOLTIP_M = 12;
 const SPOT_PAD = 6;
 
 export function TourOverlay() {
+  const screen = useWorkflowStore((s) => s.screen);
   const tour = useWorkflowStore((s) => s.tour);
   const startTour = useWorkflowStore((s) => s.startTour);
   const nextStep = useWorkflowStore((s) => s.nextTourStep);
   const prevStep = useWorkflowStore((s) => s.prevTourStep);
   const endTour = useWorkflowStore((s) => s.endTour);
 
-  // Auto-start the tour on the first visit per browser.
+  // Auto-start the tour on the first visit per browser, only when in the editor.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    if (screen !== "editor") return;
     if (hasSeenTour()) return;
     const t = setTimeout(() => startTour(), 900);
     return () => clearTimeout(t);
-  }, [startTour]);
+  }, [startTour, screen]);
+
+  // End the tour if we navigate away from the editor.
+  useEffect(() => {
+    if (screen !== "editor" && tour.active) {
+      endTour();
+    }
+  }, [screen, tour.active, endTour]);
 
   const stepIdx = tour.step;
   const step = TOUR_STEPS[stepIdx];
@@ -125,7 +134,7 @@ export function TourOverlay() {
     setTooltipPos(chosen);
   }, [tour.active, tour.step, step, rect]);
 
-  if (!tour.active || !step || typeof document === "undefined") return null;
+  if (screen !== "editor" || !tour.active || !step || typeof document === "undefined") return null;
 
   const isLast = stepIdx === TOUR_STEPS.length - 1;
   const isFirst = stepIdx === 0;

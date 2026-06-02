@@ -24,7 +24,7 @@ import type {
   PolicyStatus,
   AppScreen,
 } from "./types";
-import { computeStatus, defaultData, defaultApprovalLevel, defaultApprovalSplit, defaultConditionalBranch, defaultApprovalPolicyRef, defaultExit, defaultSkip, defaultNotification, defaultSodCheck, defaultApprovalLevelConfig, uid } from "./defaults";
+import { computeStatus, defaultData, defaultApprovalLevel, defaultApprovalSplit, defaultConditionalBranch, defaultConditionalBranchV2, defaultApprovalPolicyRef, defaultExit, defaultSkip, defaultNotification, defaultSodCheck, defaultApprovalLevelConfig, uid } from "./defaults";
 import { ensureApprovalPolicyEvent, APPROVAL_POLICY_EVENT_NAME } from "./approval-policy";
 import { inferRoutingAttributeIds } from "./conditional-routing";
 import { syncApprovalSplitAttributes } from "./split-by-attribute";
@@ -543,6 +543,8 @@ export const useWorkflowStore = create<WorkflowStore>()(
           data = defaultApprovalSplit();
         } else if (presetType?.taskType === "conditional_branch") {
           data = defaultConditionalBranch();
+        } else if (presetType?.taskType === "conditional_branch_v2") {
+          data = defaultConditionalBranchV2();
         } else if (presetType?.taskType === "approval_policy_ref") {
           data = defaultApprovalPolicyRef();
         } else if (presetType?.taskType === "exit") {
@@ -839,7 +841,8 @@ export const useWorkflowStore = create<WorkflowStore>()(
           if (
             n.kind === "task" &&
             ((n.data as AnyTaskData).taskType === "approval_split" ||
-              (n.data as AnyTaskData).taskType === "conditional_branch")
+              (n.data as AnyTaskData).taskType === "conditional_branch" ||
+              (n.data as AnyTaskData).taskType === "conditional_branch_v2")
           ) {
             const splitData = n.data as ApprovalSplitData;
             const levelPatch = data as Partial<ApprovalLevelConfig>;

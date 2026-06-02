@@ -5,11 +5,18 @@ export type TaskType =
   | "approval_level"
   | "approval_split"
   | "conditional_branch"
+  | "conditional_branch_v2"
   | "approval_policy_ref"
   | "exit"
   | "skip"
   | "notification"
   | "sod_check";
+
+/** Case values selectable per boolean attribute in a Conditional Type 2 block. */
+export type BooleanCaseValue = "true" | "false" | "any" | "none";
+
+/** Condition category for Conditional Type 2 — extensible for future types. */
+export type ConditionalV2ConditionType = "boolean";
 
 /** What happens when a Segregation of Duties violation is detected. */
 export type SodViolationAction = "notify" | "continue" | "exit";
@@ -53,6 +60,7 @@ export interface ApprovalLevelConfig {
     | "skip"
     | "notification"
     | "conditional_branch"
+    | "conditional_branch_v2"
     | "approval_split"
     | "sod_check"
     | "filter"
@@ -230,6 +238,10 @@ export interface EmbeddedConditionalData {
   completionMode?: CompletionMode;
   threshold?: number;
   branchAttributes?: string[];
+  /** V2 fields */
+  conditionType?: ConditionalV2ConditionType;
+  selectedAttributes?: string[];
+  attributeCases?: Record<string, BooleanCaseValue[]>;
 }
 
 export interface SplitBranchData {
@@ -378,11 +390,35 @@ export interface NotificationData {
   emailMessage?: string;
 }
 
+/** Condition-routed branching via Boolean relationship attributes.
+ *  The config panel surfaces a Condition Type picker (currently only "boolean")
+ *  then shows the 8 IAM relationship attributes with True/False/Any/None chips.
+ *  Branches are derived from `selectedAttributes` + `attributeCases` on every patch
+ *  via `syncConditionalV2Branches()` — they are not edited independently. */
+export interface ConditionalBranchV2Data {
+  taskType: "conditional_branch_v2";
+  name: string;
+  /** Active condition category. */
+  conditionType: ConditionalV2ConditionType;
+  /** Ordered attribute ids the user has toggled on. */
+  selectedAttributes: string[];
+  /** Per-attribute selected case values — each entry generates one branch. */
+  attributeCases: Record<string, BooleanCaseValue[]>;
+  /** When true a catch-all "Else" branch is appended after all condition branches. */
+  elseEnabled: boolean;
+  /** Derived from selectedAttributes + attributeCases. Rebuilt on every patch. */
+  branches: SplitBranchData[];
+  globalFallbackType: FallbackType | "";
+  globalFallbackEmail: string;
+  globalFallbackUsers?: string[];
+}
+
 export type AnyTaskData =
   | TaskData
   | ApprovalLevelData
   | ApprovalSplitData
   | ConditionalBranchData
+  | ConditionalBranchV2Data
   | ApprovalPolicyRefData
   | ExitData
   | SkipData

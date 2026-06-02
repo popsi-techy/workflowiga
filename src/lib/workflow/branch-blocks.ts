@@ -1,5 +1,6 @@
 import { uid } from "./defaults";
 import { buildConditionalBranches } from "./conditional-branch";
+import { syncEmbeddedConditionalV2Branches } from "./boolean-branch";
 import {
   formatNotificationAudiences,
   normalizeNotificationAudiences,
@@ -127,6 +128,41 @@ export function defaultEmbeddedConditional(
     branches: resolvedBranches,
     ...rest,
   };
+}
+
+/** Conditional branch v2 nested inside a parent branch column. */
+export function defaultNestedConditionalV2Level(
+  overrides: Partial<EmbeddedConditionalData> & { name: string },
+): ApprovalLevelConfig {
+  return {
+    id: uid("lvl"),
+    blockType: "conditional_branch_v2",
+    name: overrides.name,
+    approverType: "",
+    fallbackType: "",
+    fallbackEmail: "",
+    slaEnabled: false,
+    slaDuration: 48,
+    slaDurationUnit: "hours",
+    autoApproveOnTimeout: false,
+    embeddedConditional: defaultEmbeddedConditionalV2(overrides),
+  };
+}
+
+export function defaultEmbeddedConditionalV2(
+  overrides: Partial<EmbeddedConditionalData> & { name: string },
+): EmbeddedConditionalData {
+  const { name, branches, ...rest } = overrides;
+  const base: EmbeddedConditionalData = {
+    name,
+    conditionType: "boolean",
+    selectedAttributes: [],
+    attributeCases: {},
+    elseEnabled: true,
+    branches: branches ?? [],
+    ...rest,
+  };
+  return syncEmbeddedConditionalV2Branches(base);
 }
 
 /** Parallel multisplit nested inside a parent branch column. */
