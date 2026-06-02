@@ -12,6 +12,7 @@ import {
   ShieldHalf,
   SkipForward,
   Split,
+  ToggleRight,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -21,6 +22,7 @@ import {
   defaultBranchModuleConfig,
   defaultBranchNotificationConfig,
   defaultNestedConditionalLevel,
+  defaultNestedConditionalV2Level,
   defaultNestedMultisplitLevel,
 } from "@/lib/workflow/branch-blocks";
 import type {
@@ -97,6 +99,15 @@ const CONDITIONAL_OPTION: BranchBlockOption = {
     }),
 };
 
+const CONDITIONAL_V2_OPTION: BranchBlockOption = {
+  id: "conditional_branch_v2",
+  label: "Conditional Type 2",
+  description: "Branch on boolean relationship attributes",
+  icon: ToggleRight,
+  makePreset: () =>
+    defaultNestedConditionalV2Level({ name: "Conditional Type 2" }),
+};
+
 const EXIT_OPTION: BranchBlockOption = {
   id: "exit",
   label: "Exit",
@@ -146,6 +157,7 @@ export function branchBlockOptions(
     SOD_OPTION,
     NOTIFICATION_OPTION,
     CONDITIONAL_OPTION,
+    CONDITIONAL_V2_OPTION,
     MULTISPLIT_OPTION,
     EXIT_OPTION,
     SKIP_OPTION,
