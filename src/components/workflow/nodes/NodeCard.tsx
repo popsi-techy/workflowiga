@@ -1674,6 +1674,8 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
                       caseVal = "Else";
                     } else if (branch.id === "br_v2_empty_if") {
                       caseVal = "IF";
+                    } else if (group.type === "advanced") {
+                      caseVal = ""; // No label for advanced expression branch
                     } else {
                       const suffix = branch.id.replace(`br_v2_${group.id}_`, "");
                       caseVal = suffix.charAt(0).toUpperCase() + suffix.slice(1);
@@ -1692,36 +1694,40 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
                         style={{ width: branchW, maxWidth: branchW }}
                       >
                         {/* Case Pill */}
-                        <div
-                          className={cn(
-                            "relative mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9.5px] font-bold tracking-wide uppercase shadow-sm bg-white z-10",
-                            isTrue
-                              ? "border-emerald-200 text-emerald-700"
-                              : isFalse
-                                ? "border-rose-200 text-rose-700"
-                                : isAny
-                                  ? "border-sky-200 text-sky-700"
-                                  : isIf
-                                    ? "border-amber-200 text-amber-700"
-                                    : "border-slate-300 text-slate-600"
-                          )}
-                        >
-                          <span
+                        {group.type !== "advanced" ? (
+                          <div
                             className={cn(
-                              "h-1 w-1 rounded-full",
+                              "relative mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9.5px] font-bold tracking-wide uppercase shadow-sm bg-white z-10",
                               isTrue
-                                ? "bg-emerald-500"
+                                ? "border-emerald-200 text-emerald-700"
                                 : isFalse
-                                  ? "bg-rose-500"
+                                  ? "border-rose-200 text-rose-700"
                                   : isAny
-                                    ? "bg-sky-500"
+                                    ? "border-sky-200 text-sky-700"
                                     : isIf
-                                      ? "bg-amber-500"
-                                      : "bg-slate-400"
+                                      ? "border-amber-200 text-amber-700"
+                                      : "border-slate-300 text-slate-600"
                             )}
-                          />
-                          <span>{caseVal}</span>
-                        </div>
+                          >
+                            <span
+                              className={cn(
+                                "h-1 w-1 rounded-full",
+                                isTrue
+                                  ? "bg-emerald-500"
+                                  : isFalse
+                                    ? "bg-rose-500"
+                                    : isAny
+                                      ? "bg-sky-500"
+                                      : isIf
+                                        ? "bg-amber-500"
+                                        : "bg-slate-400"
+                              )}
+                            />
+                            <span>{caseVal}</span>
+                          </div>
+                        ) : (
+                          <div className="h-[22px] mb-2 shrink-0 w-px bg-[var(--border-strong)]" />
+                        )}
 
                         {/* Branch Level cards and connector lines */}
                         <BranchLine
