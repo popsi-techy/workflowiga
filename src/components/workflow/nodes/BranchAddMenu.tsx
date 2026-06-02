@@ -262,32 +262,36 @@ export function BranchAddMenu({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="flex flex-col gap-0.5 p-1.5 pt-0">
-        {options.map((opt) => {
-          const Icon = opt.icon;
-          return (
-            <button
-              key={opt.id}
-              onClick={() => {
-                onSelect(opt.makePreset());
-                onClose();
-              }}
-              className="group flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-[var(--muted)]"
-            >
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
-                <Icon className="h-3.5 w-3.5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-[var(--foreground)]">
-                  {opt.label}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted-fg)]">
-                  {opt.description}
-                </p>
-              </div>
-            </button>
-          );
-        })}
+      <div className="relative">
+        <div className="flex flex-col gap-0.5 p-1.5 pt-0 max-h-[256px] overflow-y-auto scrollbar-thin">
+          {options.map((opt) => {
+            const Icon = opt.icon;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => {
+                  onSelect(opt.makePreset());
+                  onClose();
+                }}
+                className="group flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-[var(--muted)]"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[var(--accent)]">
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-semibold text-[var(--foreground)]">
+                    {opt.label}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted-fg)]">
+                    {opt.description}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        {/* Scroll hint — fades out at the bottom to signal more items below */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 rounded-b-lg bg-gradient-to-t from-white to-transparent" />
       </div>
     </div>,
     document.body,
