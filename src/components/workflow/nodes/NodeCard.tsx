@@ -1326,7 +1326,7 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
   // Group branches by selected attributes
   const groups: Array<{
     id: string;
-    type: "attribute" | "else" | "placeholder";
+    type: "attribute" | "else" | "placeholder" | "advanced";
     name: string;
     branches: import("@/lib/workflow/types").SplitBranchData[];
     anyBranchMerges: boolean;
@@ -1371,6 +1371,24 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
           type: "attribute",
           name: attr,
           branches: attrBranches,
+          anyBranchMerges,
+          endsWithExit: !anyBranchMerges,
+        });
+      }
+    }
+  }
+
+  if (data.advancedConditions && data.advancedConditions.length > 0) {
+    for (const adv of data.advancedConditions) {
+      const advBranch = data.branches.find((b) => b.id === adv.id);
+      if (advBranch) {
+        const continuingBranches = [advBranch].filter((b) => !branchEndsWithExit(b));
+        const anyBranchMerges = continuingBranches.length > 0;
+        groups.push({
+          id: adv.id,
+          type: "advanced",
+          name: adv.name || "Advanced Expression",
+          branches: [advBranch],
           anyBranchMerges,
           endsWithExit: !anyBranchMerges,
         });
@@ -1523,7 +1541,7 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
               return left + w / 2;
             });
 
-            const isDefaultView = isDefault;
+            const isDefaultView = isDefault && !(data.advancedConditions && data.advancedConditions.length > 0);
 
             if (isDefaultView) {
               const branch = group.branches[0];
@@ -1570,6 +1588,13 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
                     <div className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-medium text-[var(--muted-fg)] shadow-sm">
                       <HelpCircle className="h-3.5 w-3.5 text-slate-400" />
                       <span>IF Set condition</span>
+                    </div>
+                  ) : group.type === "advanced" ? (
+                    <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-orange-50 px-3 py-1 text-[11px] font-semibold text-orange-800 shadow-sm">
+                      <span className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
+                      <span className="font-mono text-[10.5px] truncate max-w-[200px]" title={group.name}>
+                        {group.name}
+                      </span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
