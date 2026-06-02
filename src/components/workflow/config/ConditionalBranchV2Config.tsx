@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check, Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useWorkflowStore } from "@/lib/workflow/store";
@@ -37,6 +38,7 @@ export function ConditionalBranchV2Config({
 }) {
   const data = node.data as ConditionalBranchV2Data;
   const updateNode = useWorkflowStore((s) => s.updateNode);
+  const [showAll, setShowAll] = useState(false);
 
   function patch(fields: Partial<ConditionalBranchV2Data>) {
     const merged = { ...data, ...fields };
@@ -84,6 +86,12 @@ export function ConditionalBranchV2Config({
     ? data.branches.length - 1
     : data.branches.length;
 
+  const visibleAttributes = BOOLEAN_ATTRIBUTES.filter((attr, idx) => {
+    if (showAll) return true;
+    if (idx < 3) return true;
+    return data.selectedAttributes.includes(attr.value);
+  });
+
   return (
     <div className="flex h-full flex-col">
       <ConfigBody>
@@ -110,7 +118,7 @@ export function ConditionalBranchV2Config({
           inset={false}
         >
           <div className="flex flex-col gap-2">
-            {BOOLEAN_ATTRIBUTES.map((attr) => {
+            {visibleAttributes.map((attr) => {
               const isSelected = data.selectedAttributes.includes(attr.value);
               const selectedCases = data.attributeCases[attr.value] ?? [];
 
@@ -204,11 +212,32 @@ export function ConditionalBranchV2Config({
                 </div>
               );
             })}
+
+            {/* Load more / Show less trigger button */}
+            {visibleAttributes.length < BOOLEAN_ATTRIBUTES.length ? (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] bg-white py-2 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]/30 hover:border-[var(--accent)]/30 transition-all cursor-pointer"
+              >
+                Load {BOOLEAN_ATTRIBUTES.length - visibleAttributes.length} more attributes
+              </button>
+            ) : (
+              showAll && (
+                <button
+                  type="button"
+                  onClick={() => setShowAll(false)}
+                  className="mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] bg-white py-2 text-[12px] font-medium text-[var(--muted-fg)] hover:bg-[var(--muted)]/50 hover:text-[var(--foreground)] transition-all cursor-pointer"
+                >
+                  Show less
+                </button>
+              )
+            )}
           </div>
 
           {/* Summary footer */}
           {totalConditionBranches > 0 && (
-            <p className="mt-1 text-[11px] text-[var(--muted-fg)]">
+            <p className="mt-2.5 text-[11px] text-[var(--muted-fg)]">
               <span className="font-semibold text-[var(--foreground)]">{totalConditionBranches}</span>{" "}
               condition {totalConditionBranches !== 1 ? "branches" : "branch"} will be created on the canvas
               {data.elseEnabled && " · plus an Else branch"}.
