@@ -27,6 +27,7 @@ import type {
 import { computeStatus, defaultData, defaultApprovalLevel, defaultApprovalSplit, defaultConditionalBranch, defaultConditionalBranchV2, defaultApprovalPolicyRef, defaultExit, defaultSkip, defaultNotification, defaultSodCheck, defaultApprovalLevelConfig, uid } from "./defaults";
 import { ensureApprovalPolicyEvent, APPROVAL_POLICY_EVENT_NAME } from "./approval-policy";
 import { inferRoutingAttributeIds } from "./conditional-routing";
+import { dedupeWorkflowBranchIds } from "./conditional-branch";
 import { syncApprovalSplitAttributes } from "./split-by-attribute";
 import {
   migrateActionDecisionNodes,
@@ -75,6 +76,12 @@ import {
   syncNestedMultisplitDecisions,
   withSyncedMultisplitDecisions,
 } from "./multisplit-decision";
+import { insertAssistantNodesAtTarget } from "./assistant/assistant-insert";
+import {
+  inferDefaultInsertTarget,
+  resolveTargetFromSelection,
+  type AssistantInsertTarget,
+} from "./assistant/insert-target";
 
 const CURRENT_USER = "Aman Kumar";
 
@@ -371,6 +378,10 @@ interface State {
   screen: AppScreen;
   /** Which table the list screen shows. */
   listType: PolicyType;
+  /** Conversational workflow assistant drawer (approval policies). */
+  assistantOpen: boolean;
+  /** Where the assistant inserts the next block. */
+  assistantInsertTarget: AssistantInsertTarget | null;
 }
 
 export interface ConfirmRequest {
@@ -441,6 +452,15 @@ interface Actions {
   commitCurrentPolicy: (status?: PolicyStatus) => void;
   /** Align store state to a URL (used on initial load and back/forward nav). */
   syncFromRoute: (route: { screen: AppScreen; type: PolicyType; policyId?: string }) => void;
+  setAssistantOpen: (open: boolean) => void;
+  toggleAssistant: () => void;
+  setAssistantInsertTarget: (target: AssistantInsertTarget | null) => void;
+  /** Append nodes to the canvas at the assistant insert target (single undo step). */
+  appendAssistantNodes: (newNodes: WorkflowNode[]) => void;
+  /** Replace workflow nodes from a template (single undo step). */
+  applyAssistantTemplate: (nodes: WorkflowNode[]) => void;
+  /** Open or create an approval policy by name and replace its workflow graph. */
+  installAssistantWorkflowPolicy: (name: string, nodes: WorkflowNode[]) => string;
 }
 
 export type WorkflowStore = State & Actions;
@@ -466,6 +486,8 @@ const initialState: State = {
   currentPolicyId: null,
   screen: "list",
   listType: "workflow",
+  assistantOpen: false,
+  assistantInsertTarget: null,
 };
 
 const TOUR_SEEN_KEY = "iam-workflow-tour-seen";
@@ -827,12 +849,19 @@ export const useWorkflowStore = create<WorkflowStore>()(
         return decisionId;
       },
 
-      selectNode: (id) =>
+      selectNode: (id) => {
+        const state = get();
+        const fromSelection =
+          id && state.assistantOpen
+            ? resolveTargetFromSelection(state.nodes, id)
+            : null;
         set({
           selectedId: id,
           rightPanelOpen: id != null,
           rightPanelView: id != null ? "config" : get().rightPanelView,
-        }),
+          ...(fromSelection ? { assistantInsertTarget: fromSelection } : {}),
+        });
+      },
 
       updateNode: (id, data) => {
         const state = get();
@@ -910,6 +939,138 @@ export const useWorkflowStore = create<WorkflowStore>()(
 
       toggleMainNav: () =>
         set((s) => ({ mainNavCollapsed: !s.mainNavCollapsed })),
+
+      setAssistantOpen: (open) =>
+        set({
+          assistantOpen: open,
+          ...(open ? { rightPanelView: "config" as const } : {}),
+        }),
+
+      toggleAssistant: () =>
+        set((s) => ({
+          assistantOpen: !s.assistantOpen,
+          ...(s.assistantOpen ? {} : { rightPanelView: "config" as const }),
+        })),
+
+      setAssistantInsertTarget: (target) =>
+        set({ assistantInsertTarget: target }),
+
+      appendAssistantNodes: (newNodes) => {
+        const state = get();
+        if (!newNodes.length) return;
+        const target =
+          state.assistantInsertTarget ?? inferDefaultInsertTarget(state.nodes);
+        const result = insertAssistantNodesAtTarget(
+          state.nodes,
+          target,
+          newNodes,
+          state.editorContext,
+        );
+        let nodes = dedupeWorkflowBranchIds(result.nodes);
+        if (state.editorContext === "approval") {
+          nodes = ensureApprovalPolicyEvent(nodes);
+        } else {
+          nodes = normalizeWorkflowNodes(nodes);
+        }
+        set({
+          nodes,
+          selectedId: result.selectedId,
+          assistantInsertTarget: result.nextTarget,
+          history: pushHistory(state),
+        });
+      },
+
+      applyAssistantTemplate: (templateNodes) => {
+        const state = get();
+        let nodes = dedupeWorkflowBranchIds(
+          templateNodes.map((n) => ({
+            ...n,
+            status: computeStatus(n),
+          })),
+        );
+        if (state.editorContext === "approval") {
+          nodes = ensureApprovalPolicyEvent(nodes);
+        } else {
+          nodes = normalizeWorkflowNodes(nodes);
+        }
+        set({
+          nodes,
+          selectedId: null,
+          assistantInsertTarget: inferDefaultInsertTarget(nodes),
+          history: pushHistory(state),
+        });
+      },
+
+      installAssistantWorkflowPolicy: (name, templateNodes) => {
+        const state = get();
+        const committed = syncPolicies(
+          state.policies,
+          state.currentPolicyId,
+          state.nodes,
+        );
+        const cleanName = name.trim();
+        const existing = committed.find(
+          (p) =>
+            p.type === "approval" &&
+            p.name.toLowerCase() === cleanName.toLowerCase(),
+        );
+
+        let nodes = dedupeWorkflowBranchIds(
+          templateNodes.map((n) => ({
+            ...n,
+            status: computeStatus(n),
+          })),
+        );
+        nodes = ensureApprovalPolicyEvent(nodes);
+
+        if (existing) {
+          const policies = committed.map((p) =>
+            p.id === existing.id
+              ? {
+                  ...p,
+                  nodes: JSON.parse(JSON.stringify(nodes)) as WorkflowNode[],
+                  updatedAt: new Date().toISOString(),
+                }
+              : p,
+          );
+          set({
+            policies,
+            currentPolicyId: existing.id,
+            editorContext: "approval",
+            screen: "editor",
+            nodes,
+            selectedId: null,
+            assistantOpen: true,
+            rightPanelOpen: false,
+            history: pushHistory(state),
+          });
+          return existing.id;
+        }
+
+        const id = uid("pol");
+        const now = new Date().toISOString();
+        const newPolicy: Policy = {
+          id,
+          name: cleanName,
+          type: "approval",
+          status: "draft",
+          nodes: JSON.parse(JSON.stringify(nodes)) as WorkflowNode[],
+          createdAt: now,
+          updatedAt: now,
+        };
+        set({
+          policies: [newPolicy, ...committed],
+          currentPolicyId: id,
+          editorContext: "approval",
+          screen: "editor",
+          nodes,
+          selectedId: null,
+          assistantOpen: true,
+          rightPanelOpen: false,
+          history: pushHistory(state),
+        });
+        return id;
+      },
 
       setRightPanelOpen: (open) => set({ rightPanelOpen: open }),
 
@@ -1079,7 +1240,9 @@ export const useWorkflowStore = create<WorkflowStore>()(
         const committed = syncPolicies(state.policies, state.currentPolicyId, state.nodes);
         const target = committed.find((p) => p.id === id);
         if (!target) return;
-        let nodes = JSON.parse(JSON.stringify(target.nodes)) as WorkflowNode[];
+        let nodes = dedupeWorkflowBranchIds(
+          JSON.parse(JSON.stringify(target.nodes)) as WorkflowNode[],
+        );
         if (target.type === "approval") {
           nodes = ensureApprovalPolicyEvent(nodes);
         } else {

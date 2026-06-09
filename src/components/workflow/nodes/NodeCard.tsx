@@ -47,7 +47,13 @@ import {
   isConditionalSetupComplete,
   resolveElseEnabled,
 } from "@/lib/workflow/conditional-branch";
-import { branchIdForAttrCase } from "@/lib/workflow/boolean-branch";
+import { branchIdForAttrCase, BOOLEAN_CASE_LABELS } from "@/lib/workflow/boolean-branch";
+import {
+  formatApprovalConditionRule,
+  formatConditionValue,
+  getApprovalV2AttributeLabel,
+  normalizeBooleanCaseValue,
+} from "@/lib/workflow/approval-conditional-v2";
 import { separableOutcomes } from "@/lib/workflow/decision-outcomes";
 import {
   hasInlineDecision,
@@ -414,7 +420,7 @@ function nodeSubtitle(node: WorkflowNode): string {
   }
   if (td.taskType === "conditional_branch_v2") {
     const cd = td as import("@/lib/workflow/types").ConditionalBranchV2Data;
-    if (cd.selectedAttributes.length === 0) return "Select boolean attributes to branch on";
+    if (cd.selectedAttributes.length === 0) return "Select relationship conditions to branch on";
     const condBranches = cd.elseEnabled ? cd.branches.length - 1 : cd.branches.length;
     const elseNote = cd.elseEnabled ? " · else path" : "";
     return `${cd.selectedAttributes.length} ${cd.selectedAttributes.length === 1 ? "attribute" : "attributes"} · ${condBranches} ${condBranches === 1 ? "branch" : "branches"}${elseNote}`;
@@ -1034,10 +1040,11 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
           />
           {renderBranches.map((branch, idx) => {
             const x = centers[idx]!;
+            const branchKey = `${branch.id}-${idx}`;
             if (x < spineX) {
               return (
                 <path
-                  key={branch.id}
+                  key={branchKey}
                   d={`M ${spineX} ${ySplit} L ${x + connR} ${ySplit} Q ${x} ${ySplit} ${x} ${ySplit + connR} L ${x} ${connH}`}
                   stroke="var(--border-strong)"
                   strokeWidth="1.5"
@@ -1048,7 +1055,7 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
             if (x > spineX) {
               return (
                 <path
-                  key={branch.id}
+                  key={branchKey}
                   d={`M ${spineX} ${ySplit} L ${x - connR} ${ySplit} Q ${x} ${ySplit} ${x} ${ySplit + connR} L ${x} ${connH}`}
                   stroke="var(--border-strong)"
                   strokeWidth="1.5"
@@ -1058,7 +1065,7 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
             }
             return (
               <path
-                key={branch.id}
+                key={branchKey}
                 d={`M ${spineX} ${ySplit} L ${spineX} ${connH}`}
                 stroke="var(--border-strong)"
                 strokeWidth="1.5"
@@ -1073,7 +1080,7 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
           {renderBranches.map((branch, branchIndex) => {
             return (
               <div
-                key={branch.id}
+                key={`${branch.id}-${branchIndex}`}
                 className="flex flex-col items-center animate-fade-in self-stretch"
                 style={{
                   width: widths[branchIndex],
@@ -1138,10 +1145,11 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
             // Exit-terminated branches don't draw a merge path.
             if (branchEndsWithExit(branch)) return null;
             const x = centers[idx]!;
+            const branchKey = `${branch.id}-${idx}`;
             if (x < spineX) {
               return (
                 <path
-                  key={branch.id}
+                  key={branchKey}
                   d={`M ${x} 0 L ${x} ${yMerge - connR} Q ${x} ${yMerge} ${x + connR} ${yMerge} L ${spineX} ${yMerge}`}
                   stroke="var(--border-strong)"
                   strokeWidth="1.5"
@@ -1152,7 +1160,7 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
             if (x > spineX) {
               return (
                 <path
-                  key={branch.id}
+                  key={branchKey}
                   d={`M ${x} 0 L ${x} ${yMerge - connR} Q ${x} ${yMerge} ${x - connR} ${yMerge} L ${spineX} ${yMerge}`}
                   stroke="var(--border-strong)"
                   strokeWidth="1.5"
@@ -1162,7 +1170,7 @@ function SplitBranchesFlow(props: SplitBranchesFlowProps) {
             }
             return (
               <path
-                key={branch.id}
+                key={branchKey}
                 d={`M ${spineX} 0 L ${spineX} ${yMerge}`}
                 stroke="var(--border-strong)"
                 strokeWidth="1.5"
@@ -1369,7 +1377,7 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
         groups.push({
           id: attr,
           type: "attribute",
-          name: attr,
+          name: getApprovalV2AttributeLabel(attr),
           branches: attrBranches,
           anyBranchMerges,
           endsWithExit: !anyBranchMerges,
@@ -1388,15 +1396,12 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
         if (!badgeName) {
           const conds = adv.condition.conditions;
           if (conds.length > 0) {
-            const first = conds[0];
-            const opLabel = OPERATORS.find(o => o.value === first.operator)?.label || first.operator;
-            const valStr = Array.isArray(first.value) ? first.value.join(", ") : String(first.value);
-            badgeName = `${first.attribute} ${opLabel} ${valStr}`;
+            badgeName = formatApprovalConditionRule(conds[0]);
             if (conds.length > 1) {
               badgeName += ` +${conds.length - 1}`;
             }
           } else {
-            badgeName = "Advanced Expression";
+            badgeName = "Attribute condition";
           }
         }
 
@@ -1608,14 +1613,14 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
                   ) : group.type === "advanced" ? (
                     <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-orange-50 px-3 py-1 text-[11px] font-semibold text-orange-800 shadow-sm">
                       <span className="h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
-                      <span className="font-mono text-[10.5px] truncate max-w-[200px]" title={group.name}>
+                      <span className="text-[10.5px] truncate max-w-[240px]" title={group.name}>
                         {group.name}
                       </span>
                     </div>
                   ) : (
                     <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-slate-50 px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
                       <span className="h-1.5 w-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                      <span className="font-mono text-[10.5px] truncate max-w-[200px]" title={group.name}>
+                      <span className="text-[10.5px] truncate max-w-[240px]" title={group.name}>
                         {group.name}
                       </span>
                     </div>
@@ -1694,13 +1699,16 @@ function ConditionalBranchV2Flow(props: ConditionalBranchV2FlowProps) {
                       caseVal = ""; // No label for advanced expression branch
                     } else {
                       const suffix = branch.id.replace(`br_v2_${group.id}_`, "");
-                      caseVal = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+                      const normalized = normalizeBooleanCaseValue(suffix);
+                      caseVal = normalized
+                        ? BOOLEAN_CASE_LABELS[normalized]
+                        : suffix.charAt(0).toUpperCase() + suffix.slice(1);
                     }
 
-                    const isTrue = caseVal.toLowerCase() === "true";
-                    const isFalse = caseVal.toLowerCase() === "false";
-                    const isAny = caseVal.toLowerCase() === "any";
-                    const isNone = caseVal.toLowerCase() === "none";
+                    const isTrue = caseVal === "True";
+                    const isFalse = caseVal === "False";
+                    const isAny = caseVal === "Any";
+                    const isNone = caseVal === "None";
                     const isIf = caseVal.toLowerCase() === "if";
 
                     return (
@@ -1996,10 +2004,14 @@ function BranchConditionChip({
   } else {
     const c = valid[0];
     const attr = attributeDefs.find((a) => a.value === c.attribute);
+    const attrLabel = attr?.label ?? getApprovalV2AttributeLabel(c.attribute);
     const unit = attr?.unit ?? "";
-    const val = Array.isArray(c.value) ? c.value.join(", ") : c.value;
+    const val = formatConditionValue(
+      c.attribute,
+      Array.isArray(c.value) ? c.value : String(c.value),
+    );
     const more = valid.length > 1 ? ` +${valid.length - 1}` : "";
-    detail = `${attr?.label ?? c.attribute} ${OP_SYMBOL[c.operator] ?? c.operator} ${unit}${val}${more}`;
+    detail = `${attrLabel} ${OP_SYMBOL[c.operator] ?? c.operator} ${unit}${val}${more}`;
   }
   // Catch-all and configured conditions read as "set"; only an empty IF/ELSE IF is pending.
   const configured = isCatchAll || hasCondition;

@@ -1,5 +1,4 @@
 import type {
-  AttributeDef,
   BooleanCaseValue,
   ConditionalBranchV2Data,
   SplitBranchData,
@@ -7,26 +6,17 @@ import type {
 } from "./types";
 import { defaultBranchExitConfig } from "./branch-blocks";
 import { uid } from "./defaults";
+import {
+  BOOLEAN_CASE_LABELS,
+  getApprovalV2AttributeLabel,
+  normalizeAttributeCases,
+  RELATIONSHIP_BOOLEAN_ATTRIBUTES,
+} from "./approval-conditional-v2";
 
 /** The 8 IAM relationship boolean attributes available in Conditional Type 2. */
-export const BOOLEAN_ATTRIBUTES: AttributeDef[] = [
-  { value: "isRequesterManagerOfSubject", label: "isRequesterManagerOfSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isAnyOwnerLineManagerOfSubject", label: "isAnyOwnerLineManagerOfSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isRequesterItemOwner", label: "isRequesterItemOwner", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isAnyOwnerSameDeptAsSubject", label: "isAnyOwnerSameDeptAsSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isLineManagerSameDeptAsSubject", label: "isLineManagerSameDeptAsSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isRequesterSameDeptAsSubject", label: "isRequesterSameDeptAsSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isRequesterSameCompanyAsSubject", label: "isRequesterSameCompanyAsSubject", type: "select", options: ["true", "false", "any", "none"] },
-  { value: "isAnyOwnerSameCompanyAsSubject", label: "isAnyOwnerSameCompanyAsSubject", type: "select", options: ["true", "false", "any", "none"] },
-];
+export const BOOLEAN_ATTRIBUTES = RELATIONSHIP_BOOLEAN_ATTRIBUTES;
 
-/** Human-readable label for each case chip. */
-export const BOOLEAN_CASE_LABELS: Record<BooleanCaseValue, string> = {
-  true: "True",
-  false: "False",
-  any: "Any",
-  none: "None",
-};
+export { BOOLEAN_CASE_LABELS };
 
 /** Ordered case values as they appear in the UI row. */
 export const BOOLEAN_CASE_ORDER: BooleanCaseValue[] = ["true", "false", "any", "none"];
@@ -39,7 +29,7 @@ export function branchIdForAttrCase(attr: string, val: BooleanCaseValue): string
 
 /** Display name for an auto-generated branch. */
 export function branchNameForAttrCase(attr: string, val: BooleanCaseValue): string {
-  return `${attr} · ${BOOLEAN_CASE_LABELS[val]}`;
+  return `${getApprovalV2AttributeLabel(attr)} · ${BOOLEAN_CASE_LABELS[val]}`;
 }
 
 /** Rebuilds the `branches` array from the current selections.
@@ -48,6 +38,9 @@ export function syncConditionalV2Branches(
   data: ConditionalBranchV2Data,
   previousBranches: SplitBranchData[] = [],
 ): ConditionalBranchV2Data {
+  const attributeCases = normalizeAttributeCases(data.attributeCases ?? {});
+  const syncedData = { ...data, attributeCases };
+
   // Build a lookup of previous branches by stable id.
   const prev = new Map<string, SplitBranchData>(
     previousBranches.map((b) => [b.id, b]),
@@ -57,15 +50,15 @@ export function syncConditionalV2Branches(
 
   // Check if we have any active cases selected across all selected attributes
   let hasAnyCases = false;
-  for (const attr of data.selectedAttributes) {
-    const cases = data.attributeCases[attr] ?? [];
+  for (const attr of syncedData.selectedAttributes) {
+    const cases = syncedData.attributeCases[attr] ?? [];
     if (cases.length > 0) {
       hasAnyCases = true;
       break;
     }
   }
 
-  if (data.selectedAttributes.length === 0 || !hasAnyCases) {
+  if (syncedData.selectedAttributes.length === 0 || !hasAnyCases) {
     const emptyId = "br_v2_empty_if";
     const existingEmpty = prev.get(emptyId);
     conditionBranches.push({
@@ -75,8 +68,8 @@ export function syncConditionalV2Branches(
       condition: { logic: "AND", conditions: [] },
     });
   } else {
-    for (const attr of data.selectedAttributes) {
-      const cases = data.attributeCases[attr] ?? [];
+    for (const attr of syncedData.selectedAttributes) {
+      const cases = syncedData.attributeCases[attr] ?? [];
       for (const val of BOOLEAN_CASE_ORDER.filter((v) => cases.includes(v))) {
         const id = branchIdForAttrCase(attr, val);
         const name = branchNameForAttrCase(attr, val);
@@ -101,7 +94,7 @@ export function syncConditionalV2Branches(
     }
   }
 
-  const advancedBranches: SplitBranchData[] = (data.advancedConditions ?? []).map(adv => {
+  const advancedBranches: SplitBranchData[] = (syncedData.advancedConditions ?? []).map(adv => {
     const existing = prev.get(adv.id);
     return {
       id: adv.id,
@@ -112,7 +105,7 @@ export function syncConditionalV2Branches(
   });
 
   let elseBranch: SplitBranchData | null = null;
-  if (data.elseEnabled) {
+  if (syncedData.elseEnabled) {
     const elseId = "br_v2_else";
     const existingElse = prev.get(elseId);
     elseBranch = {
@@ -124,7 +117,7 @@ export function syncConditionalV2Branches(
   }
 
   return {
-    ...data,
+    ...syncedData,
     branches: elseBranch
       ? [...conditionBranches, ...advancedBranches, elseBranch]
       : [...conditionBranches, ...advancedBranches],

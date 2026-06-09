@@ -4,7 +4,16 @@ import { useId } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { ATTRIBUTES, OPERATORS } from "@/lib/workflow/mock-data";
+import {
+  RELATIONSHIP_ATTR_LABELS,
+  RELATIONSHIP_VALUE_LABELS,
+} from "@/lib/workflow/approval-conditional-v2";
 import type { AttributeDef, Condition, Logic, Operator } from "@/lib/workflow/types";
+
+export interface AttributeGroupOption {
+  label: string;
+  attributes: AttributeDef[];
+}
 
 const MAX_CONDITIONS = 10;
 
@@ -17,6 +26,8 @@ interface Props {
   flush?: boolean;
   /** Attribute set to offer. Defaults to identity ATTRIBUTES. */
   attributes?: AttributeDef[];
+  /** Optional grouped attribute sections for the attribute dropdown. */
+  attributeGroups?: AttributeGroupOption[];
 }
 
 export function ConditionBuilder({
@@ -26,6 +37,7 @@ export function ConditionBuilder({
   onChange,
   flush = false,
   attributes = ATTRIBUTES,
+  attributeGroups,
 }: Props) {
   const id = useId();
 
@@ -101,6 +113,7 @@ export function ConditionBuilder({
               onRemove={() => removeRow(i)}
               flush={flush}
               attributes={attributes}
+              attributeGroups={attributeGroups}
             />
           ))}
         </div>
@@ -133,6 +146,7 @@ function ConditionRow({
   onRemove,
   flush,
   attributes,
+  attributeGroups,
 }: {
   condition: Condition;
   logic: Logic;
@@ -141,6 +155,7 @@ function ConditionRow({
   onRemove: () => void;
   flush: boolean;
   attributes: AttributeDef[];
+  attributeGroups?: AttributeGroupOption[];
 }) {
   const attr = attributes.find((a) => a.value === condition.attribute);
   const usesSelect = attr?.type === "select";
@@ -164,7 +179,7 @@ function ConditionRow({
         </div>
       )}
       <div className="flex items-center gap-2">
-        <Select
+        <AttributeSelect
           value={condition.attribute}
           placeholder="Attribute"
           onChange={(v) =>
@@ -173,7 +188,8 @@ function ConditionRow({
               value: usesList ? [] : "",
             })
           }
-          options={attributes.map((a) => ({ value: a.value, label: a.label }))}
+          attributes={attributes}
+          attributeGroups={attributeGroups}
           className="w-[34%]"
         />
         <Select
@@ -250,12 +266,16 @@ function ValueInput({
   }
 
   if (usesSelect && attribute.options) {
+    const isRelationship = Boolean(RELATIONSHIP_ATTR_LABELS[attribute.value]);
     return (
       <Select
         value={typeof value === "string" ? value : ""}
         placeholder="Select value"
         onChange={(v) => onChange(v)}
-        options={attribute.options.map((o) => ({ value: o, label: o }))}
+        options={attribute.options.map((o) => ({
+          value: o,
+          label: isRelationship ? (RELATIONSHIP_VALUE_LABELS[o] ?? o) : o,
+        }))}
         className="min-w-0 flex-1"
       />
     );
@@ -331,6 +351,51 @@ function Select({
           {o.label}
         </option>
       ))}
+    </select>
+  );
+}
+
+function AttributeSelect({
+  value,
+  onChange,
+  attributes,
+  attributeGroups,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  attributes: AttributeDef[];
+  attributeGroups?: AttributeGroupOption[];
+  placeholder?: string;
+  className?: string;
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={cn(
+        "h-8 min-w-0 rounded-md border border-[var(--border)] bg-white px-2 text-[12.5px] outline-none transition-colors focus:border-[var(--accent)]",
+        !value && "text-[var(--muted-fg)]",
+        className,
+      )}
+    >
+      <option value="">{placeholder ?? "Select"}</option>
+      {attributeGroups && attributeGroups.length > 0
+        ? attributeGroups.map((group) => (
+            <optgroup key={group.label} label={group.label}>
+              {group.attributes.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            </optgroup>
+          ))
+        : attributes.map((a) => (
+            <option key={a.value} value={a.value}>
+              {a.label}
+            </option>
+          ))}
     </select>
   );
 }

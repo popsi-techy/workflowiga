@@ -8,7 +8,7 @@ import {
   GRANTED_NOTIFICATION_MESSAGE,
   REJECTED_NOTIFICATION_MESSAGE,
 } from "./branch-blocks";
-import { getElseBranch } from "./conditional-branch";
+import { createDefaultElseBranch } from "./conditional-branch";
 import { APPROVAL_OUTCOME_ATTR } from "./mock-data";
 import type {
   ApprovalLevelConfig,
@@ -122,10 +122,11 @@ export function buildManagerOwnerAccessApprovalNodes(): WorkflowNode[] {
     managerActionId,
     "Manager approval",
   );
-  const managerElse = getElseBranch(managerDecisionBase.branches)!;
+  const managerElse = createDefaultElseBranch();
 
   const managerDecision: ConditionalBranchData = {
     ...managerDecisionBase,
+    elseEnabled: true,
     conditionCount: 3,
     branchCount: 4,
     branches: [

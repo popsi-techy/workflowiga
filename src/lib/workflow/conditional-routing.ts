@@ -1,5 +1,6 @@
 import { uid } from "./defaults";
 import { CONDITIONAL_ATTRIBUTES, APPROVAL_CONDITIONAL_ATTRIBUTES, OPERATORS } from "./mock-data";
+import { getApprovalV2AttributeDef } from "./approval-conditional-v2";
 import type {
   AttributeDef,
   ConditionalBranchData,
@@ -14,7 +15,7 @@ export function getRoutingAttributeDef(
 ): AttributeDef | undefined {
   const set =
     context === "approval" ? APPROVAL_CONDITIONAL_ATTRIBUTES : CONDITIONAL_ATTRIBUTES;
-  return set.find((a) => a.value === attrId);
+  return set.find((a) => a.value === attrId) ?? getApprovalV2AttributeDef(attrId);
 }
 
 export function getRoutingAttributeIds(data: ConditionalBranchData): string[] {

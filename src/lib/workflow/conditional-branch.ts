@@ -1,5 +1,10 @@
 import { uid } from "./defaults";
-import type { ApprovalLevelConfig, SplitBranchData } from "./types";
+import type {
+  ApprovalLevelConfig,
+  EmbeddedConditionalData,
+  SplitBranchData,
+  WorkflowNode,
+} from "./types";
 
 export const MIN_CONDITION_BRANCHES = 1;
 export const MAX_CONDITION_BRANCHES = 7;
@@ -239,4 +244,58 @@ export function addElseBranch(
 
 export function defaultUnconfiguredConditionalBranches(): SplitBranchData[] {
   return [createDefaultElseBranch()];
+}
+
+/** Reassign ids when the same branch id appears more than once in a list. */
+export function dedupeBranchIds(branches: SplitBranchData[]): SplitBranchData[] {
+  const seen = new Set<string>();
+  return branches.map((branch) => {
+    let next = branch;
+    if (seen.has(next.id)) {
+      next = { ...next, id: uid("br") };
+    }
+    seen.add(next.id);
+    return {
+      ...next,
+      levels: next.levels.map((level) => {
+        if (!level.embeddedConditional) return level;
+        return {
+          ...level,
+          embeddedConditional: dedupeEmbeddedBranchIds(level.embeddedConditional),
+        };
+      }),
+    };
+  });
+}
+
+function dedupeEmbeddedBranchIds(
+  data: EmbeddedConditionalData,
+): EmbeddedConditionalData {
+  return {
+    ...data,
+    branches: dedupeBranchIds(data.branches),
+  };
+}
+
+/** Ensure all split/conditional branch ids are unique across the node graph. */
+export function dedupeWorkflowBranchIds(nodes: WorkflowNode[]): WorkflowNode[] {
+  return nodes.map((node) => {
+    if (node.kind !== "task") return node;
+    const data = node.data;
+    if (
+      "taskType" in data &&
+      (data.taskType === "conditional_branch" ||
+        data.taskType === "approval_split" ||
+        data.taskType === "conditional_branch_v2")
+    ) {
+      return {
+        ...node,
+        data: {
+          ...data,
+          branches: dedupeBranchIds(data.branches),
+        },
+      };
+    }
+    return node;
+  });
 }

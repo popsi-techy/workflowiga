@@ -30,6 +30,7 @@ export function ComponentsPanel() {
   const collapsed = useWorkflowStore((s) => s.leftPanelCollapsed);
   const toggle = useWorkflowStore((s) => s.toggleLeftPanel);
   const startTour = useWorkflowStore((s) => s.startTour);
+  const setAssistantOpen = useWorkflowStore((s) => s.setAssistantOpen);
   const nodes = useWorkflowStore((s) => s.nodes);
   const editorContext = useWorkflowStore((s) => s.editorContext);
   const isApprovalEditor = editorContext === "approval";
@@ -170,6 +171,16 @@ export function ComponentsPanel() {
       </div>
 
       <footer className="flex flex-col gap-0.5 border-t border-[var(--border)] px-4 py-3">
+        {isApprovalEditor && (
+          <button
+            type="button"
+            onClick={() => setAssistantOpen(true)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-[12px] font-medium text-[#eb5424] transition-colors hover:bg-[#eb5424]/5"
+          >
+            <Sparkles className="h-3.5 w-3.5 shrink-0" />
+            Build with assistant
+          </button>
+        )}
         {!isApprovalEditor && (
           <button
             type="button"

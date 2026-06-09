@@ -6,6 +6,13 @@ import type {
   OperatorDef,
   TechnicalRoleItem,
 } from "./types";
+import {
+  APPROVAL_V2_ATTRIBUTES,
+  APPROVAL_V2_ATTRIBUTE_GROUPS,
+  RELATIONSHIP_BOOLEAN_ATTRIBUTES,
+} from "./approval-conditional-v2";
+
+export { APPROVAL_V2_ATTRIBUTES, APPROVAL_V2_ATTRIBUTE_GROUPS };
 
 export const OPERATORS: OperatorDef[] = [
   { value: "equals", label: "equals" },
@@ -200,25 +207,8 @@ export const ACCESS_CONTEXT_ATTRIBUTES: AttributeDef[] = [
 ];
 
 /** Requester / owner / line-manager relationship signals (boolean). Approval conditional branches only. */
-function approvalRelationshipAttr(value: string): AttributeDef {
-  return {
-    value,
-    label: value,
-    type: "select",
-    options: ["true", "false", "anyone"],
-  };
-}
-
-export const APPROVAL_RELATIONSHIP_ATTRIBUTES: AttributeDef[] = [
-  approvalRelationshipAttr("isRequesterManagerOfSubject"),
-  approvalRelationshipAttr("isAnyOwnerLineManagerOfSubject"),
-  approvalRelationshipAttr("isRequesterItemOwner"),
-  approvalRelationshipAttr("isAnyOwnerSameDeptAsSubject"),
-  approvalRelationshipAttr("isLineManagerSameDeptAsSubject"),
-  approvalRelationshipAttr("isRequesterSameDeptAsSubject"),
-  approvalRelationshipAttr("isRequesterSameCompanyAsSubject"),
-  approvalRelationshipAttr("isAnyOwnerSameCompanyAsSubject"),
-];
+export const APPROVAL_RELATIONSHIP_ATTRIBUTES: AttributeDef[] =
+  RELATIONSHIP_BOOLEAN_ATTRIBUTES;
 
 /** Attribute key + values the auto-created SoD decision block routes on. */
 export const SOD_RESULT_ATTR = "sod_result";
@@ -271,10 +261,11 @@ export const CONDITIONAL_ATTRIBUTES: AttributeDef[] = [
   ...ATTRIBUTES,
 ];
 
-/** Approval-policy conditional branches — workflow signals + relationship booleans. */
+/** Approval-policy conditional branches — workflow signals + relationship booleans + entity attributes. */
 export const APPROVAL_CONDITIONAL_ATTRIBUTES: AttributeDef[] = [
   ...CONDITIONAL_ATTRIBUTES,
   ...APPROVAL_RELATIONSHIP_ATTRIBUTES,
+  ...APPROVAL_V2_ATTRIBUTES,
 ];
 
 /** Attributes offered when splitting workflow branches by request context. */

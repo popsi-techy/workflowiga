@@ -10,6 +10,7 @@ import {
   Trash2,
   Pin,
   PinOff,
+  Sparkles,
 } from "lucide-react";
 import { useWorkflowStore } from "@/lib/workflow/store";
 import { cn } from "@/lib/cn";
@@ -89,6 +90,8 @@ export function EditorHeader() {
   const isConfigured =
     nodes.length > 0 && nodes.every((n) => n.status === "configured");
   const versionsActive = rightPanelOpen && rightPanelView === "versions";
+  const assistantOpen = useWorkflowStore((s) => s.assistantOpen);
+  const setAssistantOpen = useWorkflowStore((s) => s.setAssistantOpen);
 
   const headerInitial = editorContext === "approval" ? "A" : "V";
 
@@ -196,6 +199,22 @@ export function EditorHeader() {
       <div className="flex shrink-0 items-center gap-2">
         <StatusChip active={currentPolicy?.status === "active"} />
         <span className="mx-1 h-5 w-px bg-[var(--border)]" aria-hidden />
+        {editorContext === "approval" && (
+          <button
+            onClick={() => setAssistantOpen(!assistantOpen)}
+            aria-pressed={assistantOpen}
+            aria-label="Build with assistant"
+            className={cn(
+              "flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-colors",
+              assistantOpen
+                ? "bg-[#eb5424]/10 text-[#eb5424]"
+                : "text-[var(--muted-fg)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]",
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Build with assistant
+          </button>
+        )}
         <button
           onClick={onToggleVersions}
           aria-pressed={versionsActive}

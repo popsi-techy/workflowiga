@@ -484,7 +484,7 @@ const EVENT_TITLES: Record<EventType, string> = {
 const TASK_HINTS: Partial<Record<TaskType, string>> = {
   approval_split: "Parallel branches",
   conditional_branch: "First matching branch wins",
-  conditional_branch_v2: "Boolean relationship routing",
+  conditional_branch_v2: "Relationship and attribute routing with True, False, Any, or None branches",
   approval_level: "Approver, fallback & SLA",
   assign_entities: "Apps, entitlements & roles",
   approval_policy_ref: "Linked approval policy",

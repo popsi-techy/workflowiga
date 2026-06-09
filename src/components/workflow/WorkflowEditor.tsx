@@ -35,6 +35,7 @@ import { Canvas } from "./Canvas";
 import { ConfigPanel } from "./ConfigPanel";
 import { VersionsPanel } from "./VersionsPanel";
 import { CanvasToolbar } from "./CanvasToolbar";
+import { WorkflowAssistantPanel } from "./assistant/WorkflowAssistantPanel";
 import { cn } from "@/lib/cn";
 
 export function WorkflowEditor() {
@@ -45,6 +46,8 @@ export function WorkflowEditor() {
   const leftPanelCollapsed = useWorkflowStore((s) => s.leftPanelCollapsed);
   const rightPanelOpen = useWorkflowStore((s) => s.rightPanelOpen);
   const rightPanelView = useWorkflowStore((s) => s.rightPanelView);
+  const assistantOpen = useWorkflowStore((s) => s.assistantOpen);
+  const editorContext = useWorkflowStore((s) => s.editorContext);
   const undo = useWorkflowStore((s) => s.undo);
   const redo = useWorkflowStore((s) => s.redo);
   const selectedId = useWorkflowStore((s) => s.selectedId);
@@ -367,9 +370,20 @@ export function WorkflowEditor() {
           <CanvasToolbar />
         </div>
 
+        {editorContext === "approval" && (
+          <div
+            className={cn(
+              "shrink-0 overflow-hidden transition-[width] duration-200 ease-out",
+              assistantOpen ? "w-[440px]" : "w-0",
+            )}
+          >
+            {assistantOpen && <WorkflowAssistantPanel />}
+          </div>
+        )}
+
         <div
           className={cn(
-            "transition-[width] duration-200 ease-out",
+            "shrink-0 overflow-hidden transition-[width] duration-200 ease-out",
             rightPanelOpen ? "w-[400px]" : "w-0",
           )}
         >
